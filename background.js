@@ -4,10 +4,13 @@
  * listener is registered synchronously at top level, all state is in storage.
  */
 
+import { diffSnapshots } from './lib/notify.js'
 import { badgeFor, refresh } from './lib/refresh.js'
 import { loadSettings, loadSnapshot } from './lib/store.js'
 
 const ALARM = 'refresh'
+const APP = 'app' // notification-id prefix meaning "open the dashboard"
+const MAX_SEPARATE = 4 // beyond this, one summary notification instead of a flood
 
 chrome.action.onClicked.addListener(() => {
   void openApp()
@@ -26,9 +29,39 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return
-  if (changes.snapshot) void paintBadge()
+  if (changes.snapshot) {
+    void paintBadge()
+    // Every snapshot write — page Refresh or alarm — passes through here with
+    // both versions, so this is the one place updates are detected.
+    void notifyUpdates(changes.snapshot.oldValue, changes.snapshot.newValue)
+  }
   if (changes.settings) void schedule()
 })
+
+chrome.notifications.onClicked.addListener((id) => {
+  void chrome.notifications.clear(id)
+  const url = id.slice(0, id.indexOf('|'))
+  if (url === APP) void openApp()
+  else if (url.startsWith('https://github.com/')) void chrome.tabs.create({ url })
+})
+
+/** @param {any} prev @param {any} next */
+async function notifyUpdates(prev, next) {
+  const events = diffSnapshots(prev, next)
+  if (events.length === 0 || !(await loadSettings()).notify) return
+  const base = { type: /** @type {const} */ ('basic'), iconUrl: 'icons/icon-128.png', contextMessage: 'PR Tracker' }
+  if (events.length > MAX_SEPARATE) {
+    await chrome.notifications.create(`${APP}|summary:${Date.now()}`, {
+      ...base,
+      title: `${events.length} PR updates`,
+      message: events.slice(0, 3).map((e) => e.title).join('\n') + (events.length > 3 ? '\n…' : ''),
+    })
+    return
+  }
+  for (const e of events) {
+    await chrome.notifications.create(`${e.url}|${e.key}`, { ...base, title: e.title, message: e.message })
+  }
+}
 
 async function schedule() {
   const { refreshMinutes, token } = await loadSettings()

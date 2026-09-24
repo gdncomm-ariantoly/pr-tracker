@@ -13,6 +13,15 @@ Click the toolbar icon to open a dashboard of **your open PRs** and **PRs waitin
 
 Bots are excluded: GitHub App accounts, `*[bot]`, plus any logins you list in Settings. The badge shows how many PRs have your review requested; it refreshes on a timer (default 15 min).
 
+### Notifications
+
+On each refresh the new snapshot is diffed against the previous one, and a desktop notification is raised for:
+
+- **My PRs:** a new human comment, a reviewer following up in an existing thread, the PR becoming Approved or Changes requested
+- **PRs I review:** a new review request; one of *my* comments getting fixed (resolved / code changed / "done" reply) or answered by the author
+
+Clicking a notification opens that comment on GitHub. More than 4 updates at once collapse into one summary that opens the dashboard. The first fetch after install never notifies. Switch off in Settings. On macOS, Chrome itself must be allowed to notify (System Settings → Notifications → Google Chrome).
+
 ![screenshot](docs/screenshot.png)
 
 ## Setup
@@ -47,7 +56,8 @@ never loaded, or CSS that quietly defeated `element.hidden`.
 | Permission | Why it is needed |
 |---|---|
 | `storage` | Token, settings, and the last fetched snapshot |
-| `alarms` | Periodic refresh for the badge |
+| `alarms` | Periodic refresh for the badge and notifications |
+| `notifications` | Desktop alerts for new comments, approvals, review requests and fixes |
 | host `https://api.github.com/*` | The one GraphQL call that fetches the PRs |
 
 ## Limits

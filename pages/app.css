@@ -64,6 +64,8 @@ button:disabled { opacity: .6; cursor: default; }
 }
 .settings label { display: grid; gap: 4px; font-weight: 600; }
 .settings small { font-weight: 400; }
+.settings label.check { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.settings label.check small { flex-basis: 100%; }
 .settings input, .settings textarea, .settings select {
   font: inherit; padding: 6px 8px; border-radius: 6px;
   border: 1px solid var(--line); background: var(--bg); color: var(--fg);

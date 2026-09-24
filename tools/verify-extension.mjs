@@ -173,6 +173,50 @@ async function verify(context, id) {
   const requested = data.requested.nodes.length
   check('badge shows review-requested count', badge === (requested ? String(requested) : ''), JSON.stringify(badge))
 
+  // Updates → notifications. Serve a second response with one new human
+  // comment on my first PR, and check the worker raised a notification for it.
+  const worker = context.serviceWorkers()[0]
+  const before = await worker.evaluate(() => chrome.notifications.getAll())
+  check('no notifications on the first fetch', Object.keys(before).length === 0, JSON.stringify(before))
+  const updated = structuredClone(fixture)
+  const target = updated.data.mine.nodes[0]
+  target.reviewThreads.nodes.push({
+    id: 'T-new', isResolved: false, isOutdated: false, path: 'src/New.java', line: 7, resolvedBy: null,
+    comments: { nodes: [{ id: 'C-new', author: { login: 'new-reviewer', __typename: 'User' }, body: 'Please handle the empty list.', createdAt: '2099-01-01T00:00:00Z', url: `${target.url}#discussion_rNEW` }] },
+  })
+  const original = fixture.data
+  fixture.data = updated.data
+  await page.click('#refresh')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  /** @type {Record<string, unknown>} */
+  let shown = {}
+  for (let i = 0; i < 20 && Object.keys(shown).length === 0; i++) {
+    await page.waitForTimeout(150)
+    shown = await worker.evaluate(() => chrome.notifications.getAll())
+  }
+  const ids = Object.keys(shown)
+  check('a new comment raises exactly one notification', ids.length === 1, JSON.stringify(ids))
+  check('notification opens the comment on GitHub', ids[0]?.startsWith(`${target.url}#discussion_rNEW|`), ids[0])
+
+  // Turning notifications off in Settings silences the next update.
+  await worker.evaluate(() => chrome.notifications.getAll().then((all) => Promise.all(Object.keys(all).map((id) => chrome.notifications.clear(id)))))
+  await page.click('#toggle-settings')
+  await page.uncheck('#notify')
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  fixture.data = original // the comment "disappears", then comes back
+  await page.click('#refresh')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  fixture.data = updated.data
+  await page.click('#refresh')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  await page.waitForTimeout(500)
+  const silenced = await worker.evaluate(() => chrome.notifications.getAll())
+  check('notifications can be switched off', Object.keys(silenced).length === 0, JSON.stringify(silenced))
+  fixture.data = original
+  await page.click('#refresh')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+
   mode = 'sso'
   await page.click('#refresh')
   await page.waitForSelector('#error:not([hidden])')

@@ -6,7 +6,7 @@ import { DEFAULTS, normalise, parseList } from '../lib/store.js'
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
   assert.deepEqual(normalise({ token: ' x ', extraBots: ['Jenkins', 3, ''], refreshMinutes: -5 }), {
-    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15,
+    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true,
   })
 })
 

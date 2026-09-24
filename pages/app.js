@@ -228,6 +228,7 @@ $('settings').addEventListener('submit', async (event) => {
     token: typed || current.token,
     extraBots: parseList(/** @type {HTMLTextAreaElement} */ ($('bots')).value),
     refreshMinutes: Number(/** @type {HTMLSelectElement} */ ($('minutes')).value),
+    notify: input('notify').checked,
   })
   input('token').value = ''
   input('token').placeholder = typed || current.token ? 'Token saved — paste a new one to replace it' : 'ghp_… or github_pat_…'
@@ -274,6 +275,7 @@ async function init() {
   bots.value = settings.extraBots.join(', ')
   const minutes = /** @type {HTMLSelectElement} */ ($('minutes'))
   minutes.value = String(settings.refreshMinutes)
+  input('notify').checked = settings.notify
   if (settings.token) input('token').placeholder = 'Token saved — paste a new one to replace it'
   showError(typeof lastError === 'string' ? lastError : null)
   paint()
