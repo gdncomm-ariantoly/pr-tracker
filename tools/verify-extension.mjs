@@ -159,7 +159,7 @@ async function verify(context, id) {
   })
   const statusChips = page.locator('.chip.build:not(.b-unknown)')
   check('a Jenkins chip on every PR with a build', (await statusChips.count()) === expectedBuilds, `${await statusChips.count()} vs ${expectedBuilds}`)
-  check('no guessed Jenkins link while builds are visible', (await page.locator('.chip.b-unknown').count()) === 0)
+  check('no guessed CI Jenkins link while builds are visible', (await page.locator('.chip.b-unknown:not([href*="/search/?q="])').count()) === 0)
   if (expectedBuilds) {
     const firstBuild = page.locator('a.chip.build').first()
     check('the chip links to Jenkins', /jenkins/i.test((await firstBuild.getAttribute('href')) ?? ''))
@@ -169,6 +169,15 @@ async function verify(context, id) {
     await popup.close()
     check('clicking the chip opens Jenkins without toggling the card', (await card.evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open)) === openBefore)
   }
+
+  // Deployment repos: a link to their own Jenkins's search, whatever GitHub shows.
+  const deployCount = await page.evaluate(async () => {
+    const { deployJenkinsLink } = await import('../lib/store.js')
+    const { snapshot } = await chrome.storage.local.get('snapshot')
+    return /** @type {any[]} */ (/** @type {any} */ (snapshot).mine).filter((p) => !p.build && deployJenkinsLink(p)).length
+  })
+  const deployChips = page.locator('a.chip.b-unknown[href*="/search/?q="]')
+  check('deployment PRs link to their Jenkins (prod-deploy / prod-infra / np-deploy)', (await deployChips.count()) === deployCount, `${await deployChips.count()} vs ${deployCount}`)
 
   // Grouping: one section per service, stale PRs in a collapsed group at the end.
   const expectedGroups = await page.evaluate(async () => {
@@ -324,7 +333,7 @@ async function verify(context, id) {
   mode = 'jenkins-hidden'
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
-  const fallback = page.locator('a.chip.b-unknown')
+  const fallback = page.locator('a.chip.b-unknown:not([href*="/search/?q="])')
   const ciPRs = await page.evaluate(async () => {
     const { NO_CI_REPO } = await import('../lib/store.js')
     const tab = document.querySelector('[role=tab][aria-selected=true]')?.getAttribute('data-tab') ?? 'mine'

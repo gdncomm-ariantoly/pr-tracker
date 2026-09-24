@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it } from 'node:test'
 
-import { DEFAULTS, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList } from '../lib/store.js'
+import { DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList } from '../lib/store.js'
 
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
@@ -26,4 +26,13 @@ it('builds the Jenkins job link from the template', () => {
   assert.notEqual(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/product-feed', number: 1 }), null)
   assert.equal(normalise({ jenkinsTemplate: 'javascript:alert(1)' }).jenkinsTemplate, JENKINS_TEMPLATE, 'https only')
   assert.equal(normalise({ jenkinsTemplate: '' }).jenkinsTemplate, '', 'empty turns it off')
+})
+
+it('links deployment repos to the Jenkins that runs them', () => {
+  assert.deepEqual(deployJenkinsLink({ repo: 'gdncomm/prod-deployment-gdn-product-feed' }), {
+    host: 'jenkins-prod-deploy.gdn-app.com', url: 'https://jenkins-prod-deploy.gdn-app.com/search/?q=prod-deployment-gdn-product-feed',
+  })
+  assert.equal(deployJenkinsLink({ repo: 'gdncomm/prod-infra-gdn-traffic-tracker-aggregator-mongo-updates' })?.host, 'jenkins-prod-infra.gdn-app.com')
+  assert.equal(deployJenkinsLink({ repo: 'gdncomm/nonprod-rundeck-gdn-preprod' })?.host, 'jenkins-np-deploy.gdn-app.com')
+  assert.equal(deployJenkinsLink({ repo: 'gdncomm/product-feed' }), null)
 })

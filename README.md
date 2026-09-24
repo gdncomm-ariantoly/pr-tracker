@@ -23,7 +23,13 @@ Jenkins reports each PR build to GitHub (a check run named "Jenkins CI"). The ex
 
 If GitHub hides builds from the token (fine-grained tokens may not see Jenkins check runs even with Commit statuses: Read), each PR gets a plain **Jenkins ↗** link built from the *Jenkins job link* setting (default `…/job/TRFCEE/job/{repo}/job/PR-{number}/`) instead, and no banner nags about it.
 
-Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployment repos (`prod-*`, `nonprod-*`) are run by the prod / non-prod Jenkins, which post nothing to PRs, so they get no Jenkins chip, guessed link or lookup.
+Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployment repos are run by other Jenkins instances that post nothing to PRs and don't let anonymous users list jobs. So they get a **Jenkins ↗** link to that Jenkins's search for the repo name (a unique match opens the job once you're signed in), with no status:
+
+| Repo | Jenkins |
+|---|---|
+| `prod-infra-*` | `jenkins-prod-infra.gdn-app.com` |
+| `prod-*` | `jenkins-prod-deploy.gdn-app.com` |
+| `nonprod-*` | `jenkins-np-deploy.gdn-app.com` |
 
 **Status straight from Jenkins (API token).** GitHub doesn't show Jenkins check runs to fine-grained tokens, so pass/fail comes from Jenkins itself. Settings → *Jenkins API token* takes your Jenkins user ID and an API token (Jenkins → your name → Security/Configure → API Token → Add new token). Saving it asks Chrome for access to the Jenkins host (`*.gdn-app.com`). Each refresh then asks `…/PR-{number}/lastBuild/api/json` with HTTP Basic auth, at most 6 at a time. The browser's Jenkins session is never used. No job (404): no chip. A rejected token (401): red banner. Without a token, PRs show a plain **Jenkins ↗** link and a banner offers adding one. Jenkins tokens are not scoped: it carries your full Jenkins rights, though PR Tracker only reads with it. It's stored in `chrome.storage.local` like the GitHub token.
 

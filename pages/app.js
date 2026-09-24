@@ -4,7 +4,7 @@ import { markRead, normaliseInbox, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
-import { jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
+import { deployJenkinsLink, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -263,7 +263,9 @@ function renderPR(pr, viewer, showRepo) {
   setText(el, '.repo', meta.filter(Boolean).join(' · '))
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
+  const deploy = deployJenkinsLink(pr)
   if (pr.build) chips.append(buildChip(pr.build))
+  else if (deploy) chips.append(jobChip(deploy.url, 'Jenkins ↗', `Finds this repo's job on ${deploy.host} (sign in to Jenkins if asked)`))
   else if (state.jenkinsHidden && !state.snapshot?.jenkinsChecked) {
     // Only guess the job link when GitHub is hiding builds from the token; a PR
     // whose builds are visible but absent (deployment repos) has no job to link.
