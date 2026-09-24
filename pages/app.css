@@ -124,6 +124,13 @@ details.stale .pr { opacity: .8; }
 .c-pending, .c-changes_requested { background: var(--bad-bg); color: var(--bad-fg); }
 .c-review_required { background: var(--warn-bg); color: var(--warn-fg); }
 .c-req { background: var(--pink-bg); color: var(--pink-fg); }
+a.chip.build { text-decoration: none; }
+a.chip.build:hover { text-decoration: underline; }
+.chip.build::before { content: "●"; margin-right: 4px; font-size: 9px; vertical-align: 1px; }
+.b-success { background: var(--ok-bg); color: var(--ok-fg); }
+.b-failure { background: var(--bad-bg); color: var(--bad-fg); }
+.b-running, .b-pending { background: var(--warn-bg); color: var(--warn-fg); }
+.b-cancelled, .b-skipped { background: var(--gray-bg); color: var(--gray-fg); }
 
 .findings { list-style: none; margin: 0; padding: 0 16px 12px 40px; display: grid; gap: 8px; }
 .finding { border-left: 3px solid var(--bad-fg); padding: 6px 12px; background: var(--bg); border-radius: 0 6px 6px 0; }

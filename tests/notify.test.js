@@ -77,6 +77,14 @@ describe('diffSnapshots', () => {
     assert.equal(e.message, 'Nit: use Duration')
   })
 
+  it('reports my build failing and recovering, not every change', () => {
+    const b = (/** @type {any} */ state) => ({ state, url: 'https://ci/job/PR-1/4', name: 'Jenkins CI', number: 4, at: null })
+    const at = (/** @type {any} */ build) => snap({ mine: [pr({ build })] })
+    assert.deepEqual(diffSnapshots(at(b('running')), at(b('failure'))).map((e) => [e.title, e.context, e.url]), [['Build failed · api#1', 'Jenkins CI #4', 'https://ci/job/PR-1/4']])
+    assert.deepEqual(diffSnapshots(at(b('failure')), at(b('success'))).map((e) => e.title), ['Build fixed · api#1'])
+    assert.deepEqual(diffSnapshots(at(b('running')), at(b('success'))), [], 'an ordinary pass is not news')
+  })
+
   it('says nothing when nothing changed', () => {
     const s = snap({ mine: [pr({ findings: [finding({})] })], toReview: [pr({ id: 'P2', requested: true })] })
     assert.deepEqual(diffSnapshots(s, structuredClone(s)), [])

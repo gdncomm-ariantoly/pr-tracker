@@ -71,6 +71,32 @@ function setText(root, selector, text) {
   if (el) el.textContent = text
 }
 
+const BUILD_LABEL = /** @type {Record<import('../lib/analyze.js').BuildState, string>} */ ({
+  success: 'passed',
+  failure: 'failed',
+  running: 'running',
+  pending: 'queued',
+  cancelled: 'cancelled',
+  skipped: 'skipped',
+})
+
+/** @param {import('../lib/analyze.js').Build} build */
+function buildChip(build) {
+  const text = `Jenkins${build.number ? ` #${build.number}` : ''} ${BUILD_LABEL[build.state]}`
+  const el = document.createElement(build.url ? 'a' : 'span')
+  el.className = `chip build b-${build.state}`
+  el.textContent = text
+  el.title = `${build.name}${build.at ? ` · ${new Date(build.at).toLocaleString()}` : ''}`
+  if (el instanceof HTMLAnchorElement && build.url) {
+    el.href = build.url
+    el.target = '_blank'
+    el.rel = 'noopener'
+    // A link inside <summary> would also expand/collapse the card.
+    el.addEventListener('click', (event) => event.stopPropagation())
+  }
+  return el
+}
+
 /** @param {number} n */
 function countBadge(n) {
   const el = document.createElement('span')
@@ -165,6 +191,7 @@ function renderPR(pr, viewer, showRepo) {
   setText(el, '.repo', meta.filter(Boolean).join(' · '))
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
+  if (pr.build) chips.append(buildChip(pr.build))
   if (pr.isDraft) chips.append(chip('Draft', 'c-draft'))
   if (state.tab === 'toReview') chips.append(pr.requested ? chip('Review requested', 'c-req') : chip('Reviewed by you', 'c-muted'))
   if (pr.reviewDecision && DECISION_LABEL[pr.reviewDecision]) {

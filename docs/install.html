@@ -169,6 +169,7 @@
       <div class="fact">
         <h3>My PRs</h3>
         <p>Your open PRs. Each one either says "No human comments" or shows how many comments are fixed and how many aren't.</p>
+        <p>Each PR shows its latest <strong>Jenkins build</strong> (passed, failed, running) and links to it.</p>
         <p>Both tabs are grouped by service. PRs with no activity for over a week collapse into a <strong>Stale</strong> group at the bottom.</p>
       </div>
       <div class="fact">
@@ -212,13 +213,13 @@
       <li>
         <h3>Create a fine-grained token for gdncomm</h3>
         <div class="detail">
-          <p>Open the link below. It pre-fills the name, <strong>Resource owner = gdncomm</strong>, and read-only access to <strong>Pull requests</strong> and <strong>Contents</strong>. You still need to pick the repository access yourself:</p>
+          <p>Open the link below. It pre-fills the name, <strong>Resource owner = gdncomm</strong>, and read-only access to <strong>Pull requests</strong>, <strong>Contents</strong> and <strong>Commit statuses</strong>. You still need to pick the repository access yourself:</p>
           <ul class="plain">
             <li><strong>Repository access:</strong> All repositories</li>
-            <li><strong>Permissions:</strong> Pull requests: Read-only, Contents: Read-only (Metadata: Read-only is added automatically)</li>
+            <li><strong>Permissions:</strong> Pull requests, Contents and Commit statuses, all Read-only (Metadata: Read-only is added automatically). Commit statuses is what shows the Jenkins build.</li>
             <li><strong>Expiration:</strong> 90 days is pre-filled. Choose anything our org policy allows.</li>
           </ul>
-          <p><a href="https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&amp;description=Read-only+PR+dashboard&amp;target_name=gdncomm&amp;expires_in=90&amp;pull_requests=read&amp;contents=read" target="_blank" rel="noopener">Create a fine-grained token for gdncomm ↗</a></p>
+          <p><a href="https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&amp;description=Read-only+PR+dashboard&amp;target_name=gdncomm&amp;expires_in=90&amp;pull_requests=read&amp;contents=read&amp;statuses=read" target="_blank" rel="noopener">Create a fine-grained token for gdncomm ↗</a></p>
           <p>If gdncomm doesn't appear under Resource owner, sign in to the org's SSO on github.com first, then reload the page.</p>
         </div>
       </li>
@@ -245,7 +246,7 @@
     <h2 id="notify">Notifications</h2>
     <p>Each refresh (every 15 minutes by default, or when you click Refresh) is compared with the previous one. You get a desktop alert for:</p>
     <ul class="plain">
-      <li><strong>On your PRs:</strong> a new comment, a reviewer replying again in a thread, the PR getting approved or getting changes requested</li>
+      <li><strong>On your PRs:</strong> a new comment, a reviewer replying again in a thread, the PR getting approved or getting changes requested, the Jenkins build failing (and passing again after a failure)</li>
       <li><strong>On PRs you review:</strong> a new review request, one of your comments getting fixed or answered</li>
     </ul>
     <p class="muted">Clicking an alert opens that comment on GitHub. If more than four things change at once, you get one summary instead. You can turn alerts off or change the refresh interval in Settings.</p>
@@ -268,7 +269,7 @@
             <li>The token isn't still <strong>pending</strong> org approval.</li>
             <li>Resource owner is <strong>gdncomm</strong>, not your personal account.</li>
             <li>Repository access is <strong>All repositories</strong>.</li>
-            <li>Pull requests and Contents are both <strong>Read-only</strong>.</li>
+            <li>Pull requests, Contents and Commit statuses are all <strong>Read-only</strong>.</li>
           </ul>
           <p>Fix it on the token page (you don't need a new token), then click Refresh.</p>
         </div>
@@ -299,6 +300,10 @@
       <details>
         <summary>A comment counts as unfixed but doesn't need a change</summary>
         <div><p>Approvals and clean AI reviews ("No blocking issues", "flagging as solid for a human reviewer") are recognised automatically as <strong>No action needed</strong>. For anything it misses, click <strong>No action needed</strong> on the comment. Click <strong>Undo</strong> to reverse it.</p></div>
+      </details>
+      <details>
+        <summary>No Jenkins build shows on a PR</summary>
+        <div><p>Either the PR's latest commit hasn't reported a build to GitHub yet, or your token lacks <strong>Commit statuses: Read-only</strong>. Edit the token to add it (you don't need a new one), then click Refresh. If the banner mentions Commit statuses, that's the cause.</p></div>
       </details>
       <details>
         <summary>A bot account shows up as a person</summary>

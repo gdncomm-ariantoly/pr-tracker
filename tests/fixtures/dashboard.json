@@ -157,6 +157,29 @@
                 }
               }
             ]
+          },
+          "head": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "Jenkins CI",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS",
+                          "detailsUrl": "https://jenkins.example.com/job/acme/job/api/job/PR-101/3",
+                          "startedAt": "2026-09-21T03:00:00Z",
+                          "completedAt": "2026-09-21T03:12:00Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
           }
         },
         {
@@ -231,6 +254,36 @@
           },
           "reviewThreads": {
             "nodes": []
+          },
+          "head": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "__typename": "CheckRun",
+                          "name": "Jenkins CI",
+                          "status": "COMPLETED",
+                          "conclusion": "FAILURE",
+                          "detailsUrl": "https://jenkins.example.com/job/acme/job/api/job/PR-103/7",
+                          "startedAt": "2026-09-23T01:00:00Z",
+                          "completedAt": "2026-09-23T01:09:00Z"
+                        },
+                        {
+                          "__typename": "CheckRun",
+                          "name": "SonarCloud",
+                          "status": "COMPLETED",
+                          "conclusion": "SUCCESS",
+                          "detailsUrl": "https://sonarcloud.io/x"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
           }
         }
       ]

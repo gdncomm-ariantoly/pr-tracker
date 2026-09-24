@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { analyzePR, claimsFix, classifyIntent, isBot } from '../lib/analyze.js'
+import { analyzePR, claimsFix, classifyIntent, isBot, jenkinsBuild } from '../lib/analyze.js'
 
 const me = { login: 'alice', __typename: 'User' }
 const bob = { login: 'bob', __typename: 'User' }
@@ -76,6 +76,33 @@ describe('classifyIntent', () => {
   it('trusts GitHub review states', () => {
     assert.equal(classifyIntent('', 'APPROVED')?.status, 'no-action')
     assert.equal(classifyIntent('No blocking issues.', 'CHANGES_REQUESTED'), null)
+  })
+})
+
+describe('jenkinsBuild', () => {
+  /** @param {any[]} checks */
+  const withChecks = (checks) => pr({ head: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: checks } } } }] } })
+  const run = (/** @type {object} */ over) => ({ __typename: 'CheckRun', name: 'Jenkins CI', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: 'https://jenkins-build-ci-2.gdn-app.com/job/GitHub/job/gdncomm/job/GDN/job/TRFCEE/job/product-feed/job/PR-152/3', ...over })
+
+  it('reads the Jenkins CI check run with its build number and link (real shape)', () => {
+    assert.deepEqual(jenkinsBuild(withChecks([run({ completedAt: '2026-09-24T05:00:00Z' })])), {
+      state: 'success', name: 'Jenkins CI', number: 3, at: '2026-09-24T05:00:00Z',
+      url: 'https://jenkins-build-ci-2.gdn-app.com/job/GitHub/job/gdncomm/job/GDN/job/TRFCEE/job/product-feed/job/PR-152/3',
+    })
+  })
+  it('maps running, queued and failed builds', () => {
+    assert.equal(jenkinsBuild(withChecks([run({ status: 'IN_PROGRESS', conclusion: null })]))?.state, 'running')
+    assert.equal(jenkinsBuild(withChecks([run({ status: 'QUEUED', conclusion: null })]))?.state, 'pending')
+    assert.equal(jenkinsBuild(withChecks([run({ conclusion: 'TIMED_OUT' })]))?.state, 'failure')
+  })
+  it('reads a Jenkins commit status too, and the worst Jenkins job wins', () => {
+    const status = { __typename: 'StatusContext', context: 'continuous-integration/jenkins/pr-merge', state: 'FAILURE', targetUrl: 'https://ci/job/x/PR-1/9/display/redirect' }
+    assert.deepEqual(jenkinsBuild(withChecks([run({}), status])), { state: 'failure', name: 'continuous-integration/jenkins/pr-merge', number: 9, url: status.targetUrl, at: null })
+  })
+  it('ignores non-Jenkins checks and missing data', () => {
+    assert.equal(jenkinsBuild(withChecks([run({ name: 'SonarCloud', detailsUrl: 'https://sonarcloud.io/x' })])), null)
+    assert.equal(jenkinsBuild(pr({})), null)
+    assert.equal(jenkinsBuild(pr({ head: { nodes: [null, { commit: { statusCheckRollup: null } }] } })), null)
   })
 })
 

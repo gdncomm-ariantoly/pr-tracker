@@ -17,6 +17,10 @@ Anything that asks for a change ("before merge", "once … is addressed", "pleas
 
 Bots are excluded: GitHub App accounts, `*[bot]`, plus any logins you list in Settings. The badge shows how many PRs have your review requested; it refreshes on a timer (default 15 min).
 
+### Jenkins build
+
+Jenkins reports each PR build to GitHub (a check run named "Jenkins CI"). The extension reads it from the PR's head commit, so no Jenkins login is needed, and shows a chip (e.g. **Jenkins #3 passed**, failed, running, queued) that links to the build. If several Jenkins jobs report, the worst one wins.
+
 ### Layout
 
 Each tab is grouped by service (the repository name without `gdncomm/`), alphabetically, newest PR first. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
@@ -25,7 +29,7 @@ Each tab is grouped by service (the repository name without `gdncomm/`), alphabe
 
 On each refresh the new snapshot is diffed against the previous one, and a desktop notification is raised for:
 
-- **My PRs:** a new human comment, a reviewer following up in an existing thread, the PR becoming Approved or Changes requested
+- **My PRs:** a new human comment, a reviewer following up in an existing thread, the PR becoming Approved or Changes requested, the Jenkins build failing (and passing again after a failure)
 - **PRs I review:** a new review request; one of *my* comments getting fixed (resolved / code changed / "done" reply) or answered by the author
 
 Clicking a notification opens that comment on GitHub. More than 4 updates at once collapse into one summary that opens the dashboard. The first fetch after install never notifies. Switch off in Settings. On macOS, Chrome itself must be allowed to notify (System Settings → Notifications → Google Chrome).
@@ -34,9 +38,9 @@ Clicking a notification opens that comment on GitHub. More than 4 updates at onc
 
 ## Setup
 
-1. Create a **fine-grained** token with Resource owner **gdncomm** ([pre-filled link](https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&description=Read-only+PR+dashboard&target_name=gdncomm&expires_in=90&pull_requests=read&contents=read)):
+1. Create a **fine-grained** token with Resource owner **gdncomm** ([pre-filled link](https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&description=Read-only+PR+dashboard&target_name=gdncomm&expires_in=90&pull_requests=read&contents=read&statuses=read)):
    - Repository access: **All repositories**
-   - Permissions: **Pull requests: Read-only**, **Contents: Read-only** (Metadata is automatic)
+   - Permissions: **Pull requests**, **Contents** and **Commit statuses**, all Read-only (Metadata is automatic). Commit statuses is what shows the Jenkins build.
 2. If the org requires approval, wait until the token is no longer **pending**. No "Configure SSO" step is needed for fine-grained tokens.
 3. Open PR Tracker → Settings → paste it → Save.
 

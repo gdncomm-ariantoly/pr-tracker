@@ -146,6 +146,22 @@ async function verify(context, id) {
   await page.click('#tab-mine')
   check('My PRs tab renders its PRs', (await page.locator('article.pr').count()) === nMine)
 
+  // Jenkins: a chip per PR that has a build, linking to it, without toggling the card.
+  const expectedBuilds = await page.evaluate(async () => {
+    const { snapshot } = await chrome.storage.local.get('snapshot')
+    return /** @type {any} */ (snapshot).mine.filter((/** @type {any} */ p) => p.build).length
+  })
+  check('a Jenkins chip on every PR with a build', (await page.locator('.chip.build').count()) === expectedBuilds, `${await page.locator('.chip.build').count()} vs ${expectedBuilds}`)
+  if (expectedBuilds) {
+    const firstBuild = page.locator('a.chip.build').first()
+    check('the chip links to Jenkins', /jenkins/i.test((await firstBuild.getAttribute('href')) ?? ''))
+    const card = page.locator('article.pr').filter({ has: firstBuild }).first().locator('details')
+    const openBefore = await card.evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open)
+    const [popup] = await Promise.all([context.waitForEvent('page'), firstBuild.click()])
+    await popup.close()
+    check('clicking the chip opens Jenkins without toggling the card', (await card.evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open)) === openBefore)
+  }
+
   // Grouping: one section per service, stale PRs in a collapsed group at the end.
   const expectedGroups = await page.evaluate(async () => {
     const { groupPRs } = await import('../lib/group.js')
