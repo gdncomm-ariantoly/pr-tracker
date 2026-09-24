@@ -88,8 +88,8 @@ button:disabled { opacity: .6; cursor: default; }
 .tabs .n { font-size: 12px; opacity: .8; margin-left: 4px; }
 .filter { display: flex; gap: 6px; align-items: center; color: var(--muted); }
 
-main { margin: 0 0 48px; display: grid; gap: 20px; }
-.group { display: grid; gap: 8px; }
+main { margin: 0 0 48px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.group { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
 .group-head {
   font-size: 13px; font-weight: 600; margin: 0; color: var(--muted);
   display: flex; align-items: baseline; gap: 8px;
@@ -106,7 +106,7 @@ details.stale[open] > summary { margin-bottom: 8px; }
 details.stale .pr { opacity: .8; }
 .empty { text-align: center; padding: 24px; }
 
-.pr { background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+.pr { background: var(--card); border: 1px solid var(--line); border-radius: 8px; min-width: 0; overflow: hidden; } /* nothing inside may widen the list into the Updates panel */
 .pr summary {
   list-style: none; cursor: pointer; padding: 12px 16px;
   display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap;
@@ -117,7 +117,7 @@ details.stale .pr { opacity: .8; }
 .pr details.no-findings summary { cursor: default; }
 .pr details.no-findings summary::before { visibility: hidden; }
 .pr-head { flex: 1; min-width: 240px; }
-.title { font-weight: 600; color: var(--fg); }
+.title { font-weight: 600; color: var(--fg); overflow-wrap: anywhere; }
 .meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin-top: 2px; }
 .chips, .tally { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -136,7 +136,7 @@ a.chip.build:hover { text-decoration: underline; }
 .b-cancelled, .b-skipped, .b-unknown { background: var(--gray-bg); color: var(--gray-fg); }
 .b-unknown::before { display: none; }
 
-.findings { list-style: none; margin: 0; padding: 4px 20px 20px; display: grid; gap: 14px; }
+.findings { list-style: none; margin: 0; padding: 4px 20px 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .f-group { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 10px 0 -4px; }
 .f-group:first-child { margin-top: 4px; }
 .f-group.g-0 { color: var(--bad-fg); }
@@ -164,7 +164,7 @@ a.chip.build:hover { text-decoration: underline; }
 .fold { border: 0; background: none; padding: 0 2px; color: var(--muted); font-size: 12px; width: 16px; }
 
 /* replies: nested, each with its own header like GitHub */
-.conversation { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: 8px; }
+.conversation { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 8px; }
 .conversation > li { padding: 12px 14px; }
 .conversation > li + li { border-top: 1px solid var(--line); }
 .conversation .c-head { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-bottom: 8px; }

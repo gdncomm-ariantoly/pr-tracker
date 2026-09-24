@@ -211,6 +211,24 @@ async function verify(context, id) {
   // Expand the first PR with findings and check one finding's anatomy.
   const withFindings = page.locator('article.pr').filter({ has: page.locator('.findings li') }).first()
   await withFindings.locator('summary').click()
+  // Layout: an open PR must not push the list into the Updates panel.
+  await page.setViewportSize({ width: Number(process.env.VW ?? 1300), height: 900 })
+  await page.locator('article.pr details:not([open]) > summary').evaluateAll((els) => els.forEach((e) => /** @type {HTMLElement} */ (e).click()))
+  const gap = await page.evaluate(() => {
+    const inbox = /** @type {HTMLElement} */ (document.querySelector('.inbox')).getBoundingClientRect()
+    const content = /** @type {HTMLElement} */ (document.querySelector('.content')).getBoundingClientRect()
+    let right = content.right
+    let culprit = ''
+    for (const e of document.querySelectorAll('.content *')) {
+      // content scrolled inside a code block or table is clipped, not overflowing
+      if (e.parentElement?.closest('pre, table')) continue
+      const r = e.getBoundingClientRect()
+      if (r.width && r.right > right) { right = r.right; culprit = `${e.tagName}.${e.className}` }
+    }
+    return { gap: Math.round(inbox.left - right), culprit, inboxWidth: Math.round(inbox.width) }
+  })
+  if (process.env.SHOT_LAYOUT) await page.screenshot({ path: process.env.SHOT_LAYOUT })
+  check('open PRs keep their gap to the Updates panel', gap.gap >= 16 && gap.inboxWidth >= 300, JSON.stringify(gap))
   const first = withFindings.locator('.finding').first()
   check('finding shows a status', ((await first.locator('.status').textContent()) ?? '').length > 0)
   check('finding shows its author', ((await first.locator('.who').textContent()) ?? '').length > 0)

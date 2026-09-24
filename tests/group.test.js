@@ -44,3 +44,12 @@ it('moves PRs with no activity for more than 7 days to Stale, same order inside'
   assert.deepEqual(services.map((g) => g.name), ['x'])
   assert.deepEqual(stale.map((p) => p.id), ['older-unfixed', 'old'])
 })
+
+it('puts prod-* and nonprod-* deployment repos after every service, however urgent', () => {
+  const { services } = groupPRs([
+    pr('deploy-urgent', 'o/prod-seo-backend', '2026-09-24T11:00:00Z', [2, 2]),
+    pr('np', 'o/nonprod-seo-backend', '2026-09-24T11:30:00Z', [1, 1]),
+    pr('svc-quiet', 'o/seo-backend', '2026-09-23T10:00:00Z'),
+  ], NOW)
+  assert.deepEqual(services.map((g) => g.name), ['seo-backend', 'nonprod-seo-backend', 'prod-seo-backend'])
+})

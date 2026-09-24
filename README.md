@@ -35,7 +35,7 @@ Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployme
 
 ### Layout
 
-Each tab is grouped by service (the repository name without `gdncomm/`). Order is "what needs me first": PRs with unfixed comments, then PRs with comments (all fixed or no action needed), then PRs without human comments, newest update first within each. Groups follow their most urgent PR. Comments you mark *No action needed* stop counting as unfixed for sorting too. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
+Each tab is grouped by service (the repository name without `gdncomm/`). Order is "what needs me first": PRs with unfixed comments, then PRs with comments (all fixed or no action needed), then PRs without human comments, newest update first within each. Groups follow their most urgent PR, except deployment repos (`prod-*`, `nonprod-*`), which always come after the services. Comments you mark *No action needed* stop counting as unfixed for sorting too. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
 
 ### Updates panel
 
@@ -104,3 +104,5 @@ never loaded, or CSS that quietly defeated `element.hidden`.
 gh api graphql --input <(node tools/print-query.mjs) > /tmp/dashboard.json
 FIXTURE=/tmp/dashboard.json npm run verify
 ```
+
+The icon is drawn in `icons/icon.svg`; after editing it, run `node tools/make-icons.mjs` to regenerate the PNGs.

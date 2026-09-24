@@ -63,7 +63,7 @@
                 "createdAt": "2026-09-21T05:00:00Z",
                 "url": "https://github.com/acme/api/pull/1#c3",
                 "state": "CHANGES_REQUESTED",
-                "bodyHTML": "<p>Please add a test for cache eviction.</p>"
+                "bodyHTML": "<p>Please add a test for cache eviction.</p><pre><code>assertThat(cache.get(key)).isEmpty(); // evicted-after-ttl-expiry-with-a-very-long-line-that-must-scroll evicted-after-ttl-expiry-with-a-very-long-line-that-must-scroll evicted-after-ttl-expiry-with-a-very-long-line-that-must-scroll evicted-after-ttl-expiry-with-a-very-long-line-that-must-scroll evicted-after-ttl-expiry-with-a-very-long-line-that-must-scroll evicted-after-ttl-expiry-with-a-very-long-line-that-must-scroll</code></pre><p>averyveryverylongunbrokenidentifierwithoutanyspacesaveryveryverylongunbrokenidentifierwithoutanyspacesaveryveryverylongunbrokenidentifierwithoutanyspacesaveryveryverylongunbrokenidentifierwithoutanyspaces</p>"
               }
             ]
           },
@@ -152,7 +152,7 @@
                         "login": "carol",
                         "__typename": "User"
                       },
-                      "body": "nit: rename to cacheKey",
+                      "body": "nit: rename to cacheKey, and while you are here the surrounding helper methods could also use clearer names so that the next reader does not have to guess what each of them caches or for how long it keeps the entries around",
                       "createdAt": "2026-09-20T05:10:00Z",
                       "url": "https://github.com/acme/api/pull/1#c10"
                     }
