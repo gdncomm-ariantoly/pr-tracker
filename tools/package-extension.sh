@@ -44,7 +44,7 @@ zip -q -r "$out" . \
   -x 'node_modules/*' \
   -x 'tests/*' 'test/*' \
   -x 'tools/*' \
-  -x 'docs/*' \
+  -x 'docs/*' 'dist/*' \
   -x 'package.json' 'package-lock.json' 'jsconfig.json' 'tsconfig.json' \
   -x 'README.md' '*.zip' '*.map'
 

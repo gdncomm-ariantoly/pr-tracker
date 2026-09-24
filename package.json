@@ -1,6 +1,6 @@
 {
   "name": "pr-tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "PR Tracker",
@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit -p jsconfig.json",
     "verify": "node tools/verify-extension.mjs",
     "verify:headed": "node tools/verify-extension.mjs --headed",
-    "package": "sh tools/package-extension.sh ."
+    "package": "sh tools/package-extension.sh .",
+    "dist": "sh tools/make-dist.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

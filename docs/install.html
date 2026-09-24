@@ -1,0 +1,319 @@
+<title>Install PR Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f5f7f5;
+    --paper: #ffffff;
+    --ink: #1b2420;
+    --muted: #5d6a63;
+    --rule: #dbe2dd;
+    --accent: #1a7f47;
+    --accent-ink: #ffffff;
+    --accent-soft: #e3f3e8;
+    --code-bg: #eef2ef;
+    --warn-bg: #fdf6de;
+    --warn-ink: #735300;
+    --display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground: #0f1412; --paper: #161d1a; --ink: #e4ebe6; --muted: #93a19a; --rule: #2a3530;
+      --accent: #3fb870; --accent-ink: #07130c; --accent-soft: #15291d; --code-bg: #1d2622;
+      --warn-bg: #2a2412; --warn-ink: #e8c461;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #0f1412; --paper: #161d1a; --ink: #e4ebe6; --muted: #93a19a; --rule: #2a3530;
+    --accent: #3fb870; --accent-ink: #07130c; --accent-soft: #15291d; --code-bg: #1d2622;
+    --warn-bg: #2a2412; --warn-ink: #e8c461;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.6 var(--body);
+    padding-inline: 16px;
+    padding-block: 40px 72px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 48px; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  code, kbd { font-family: var(--mono); font-size: .88em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+  kbd { border: 1px solid var(--rule); border-bottom-width: 2px; background: var(--paper); }
+  h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -.01em; }
+  h1 { font-size: clamp(2rem, 6vw, 2.9rem); line-height: 1.08; }
+  h2 { font-size: 1.45rem; line-height: 1.2; }
+  h3 { font-size: 1rem; margin: 0; }
+  p { margin: 0; max-width: 65ch; }
+  .muted { color: var(--muted); }
+  .eyebrow { font: 500 .78rem/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+  /* header */
+  header { display: grid; gap: 18px; }
+  .lede { font-size: 1.12rem; color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font: 600 1rem/1 var(--body); text-decoration: none;
+    background: var(--accent); color: var(--accent-ink);
+    padding: 13px 20px; border-radius: 8px; border: 0;
+  }
+  .btn:hover { filter: brightness(1.06); }
+  .btn svg { width: 18px; height: 18px; }
+  .meta { font: 400 .85rem/1.4 var(--mono); color: var(--muted); }
+
+  figure { margin: 0; display: grid; gap: 8px; }
+  figure img { display: block; width: 100%; border-radius: 10px; border: 1px solid var(--rule); background: var(--paper); }
+  figcaption { font-size: .85rem; color: var(--muted); }
+
+  /* what it tells you */
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .fact { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 6px; align-content: start; }
+  .fact p { font-size: .93rem; color: var(--muted); }
+  .status-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .pill { font: 600 .72rem/1 var(--body); padding: 5px 9px; border-radius: 99px; }
+  .ok { background: var(--accent-soft); color: var(--accent); }
+  .mid { background: var(--warn-bg); color: var(--warn-ink); }
+
+  section { display: grid; gap: 16px; }
+
+  /* steps: a real sequence, so numbered */
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: grid; gap: 0; }
+  ol.steps > li {
+    counter-increment: step;
+    display: grid; grid-template-columns: 40px 1fr; gap: 4px 16px;
+    padding-block: 18px; border-top: 1px solid var(--rule);
+  }
+  ol.steps > li:last-child { border-bottom: 1px solid var(--rule); }
+  ol.steps > li::before {
+    content: counter(step);
+    grid-row: span 2;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: grid; place-items: center;
+    font: 600 .95rem/1 var(--mono);
+    background: var(--accent-soft); color: var(--accent);
+  }
+  ol.steps .detail { display: grid; gap: 10px; color: var(--muted); }
+  ol.steps .detail p { color: var(--muted); }
+
+  .copy {
+    display: inline-flex; align-items: center; gap: 10px; max-width: 100%;
+    background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 6px 6px 6px 12px; font: 500 .92rem/1 var(--mono); color: var(--ink);
+  }
+  .copy span { overflow-x: auto; white-space: nowrap; }
+  .copy button {
+    font: 500 .8rem/1 var(--body); cursor: pointer;
+    background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px;
+  }
+
+  .note { background: var(--warn-bg); color: var(--warn-ink); border-radius: 10px; padding: 14px 16px; font-size: .95rem; }
+  .note p { max-width: none; }
+
+  ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+
+  details { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; }
+  details + details { margin-top: -8px; }
+  summary { cursor: pointer; padding: 14px 16px; font-weight: 600; list-style-position: inside; }
+  details > div { padding: 0 16px 16px; color: var(--muted); display: grid; gap: 8px; }
+
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font: 500 .75rem/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  td:first-child { white-space: nowrap; }
+
+  footer { font-size: .85rem; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 20px; }
+
+  @media (max-width: 480px) {
+    body { padding-block: 24px 48px; }
+    ol.steps > li { grid-template-columns: 32px 1fr; gap: 4px 12px; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Internal Chrome extension · v0.2.0</span>
+    <h1>PR Tracker</h1>
+    <p class="lede">One tab with your open pull requests and the ones waiting on your review, plus every comment from a real person (bots left out) and whether it's been fixed. You get a desktop alert when something changes.</p>
+    <div class="actions">
+      <a class="btn" href="pr-tracker-0.2.0.zip" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download pr-tracker-0.2.0.zip
+      </a>
+      <span class="meta">54 KB · Chrome 116+ · github.com only</span>
+    </div>
+    <p class="muted" style="font-size:.9rem">The zip sits next to this page. To share, send the whole folder (this page, <code>screenshot.png</code> and the zip) over Teams or a shared drive.</p>
+  </header>
+
+  <figure>
+    <img src="screenshot.png" alt="PR Tracker dashboard: a PR card expanded to show four comments, each tagged Replied, Not addressed, Fixed (reply) or Resolved, with the reason under each.">
+    <figcaption>Dashboard with sample data. Unfixed comments are listed first, and each one says why it got its status.</figcaption>
+  </figure>
+
+  <section aria-labelledby="what">
+    <h2 id="what">What it shows</h2>
+    <div class="facts">
+      <div class="fact">
+        <h3>To review</h3>
+        <p>PRs where your review is requested (the toolbar badge counts these), plus open PRs you've already reviewed, so you can see whether your comments were acted on.</p>
+      </div>
+      <div class="fact">
+        <h3>My PRs</h3>
+        <p>Your open PRs. Each one either says "No human comments" or shows how many comments are fixed and how many aren't.</p>
+      </div>
+      <div class="fact">
+        <h3>Per comment</h3>
+        <p>Author, file and line, the text, a link to it on GitHub, and a status based on what happened next.</p>
+        <div class="status-row">
+          <span class="pill ok">Resolved</span><span class="pill ok">Code changed</span><span class="pill ok">Fixed (reply)</span>
+          <span class="pill mid">Replied</span><span class="pill mid">Commit after</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="install">
+    <h2 id="install">Install</h2>
+    <p class="muted">About three minutes. It isn't on the Chrome Web Store, so you load it as an unpacked extension.</p>
+    <ol class="steps">
+      <li>
+        <h3>Unzip it into a folder you'll keep</h3>
+        <div class="detail">
+          <p>Chrome loads the extension straight from this folder on every launch, so don't leave it in Downloads. For example:</p>
+          <span class="copy"><span id="c-folder">~/chrome-extensions/pr-tracker</span><button type="button" data-copy="c-folder">Copy</button></span>
+        </div>
+      </li>
+      <li>
+        <h3>Open the extensions page and turn on Developer mode</h3>
+        <div class="detail">
+          <p>Paste this into the address bar (Chrome won't open it from a link). Then turn on the <strong>Developer mode</strong> switch in the top right.</p>
+          <span class="copy"><span id="c-ext">chrome://extensions</span><button type="button" data-copy="c-ext">Copy</button></span>
+        </div>
+      </li>
+      <li>
+        <h3>Click Load unpacked and choose the folder</h3>
+        <div class="detail"><p>Pick the folder that contains <code>manifest.json</code>. A "PR Tracker" card appears.</p></div>
+      </li>
+      <li>
+        <h3>Pin it to the toolbar</h3>
+        <div class="detail"><p>Click the puzzle-piece icon next to the address bar, then the pin next to PR Tracker. The badge on it shows how many PRs are waiting for your review.</p></div>
+      </li>
+      <li>
+        <h3>Add a GitHub token</h3>
+        <div class="detail">
+          <p>Click the icon. Settings opens the first time. Create a <strong>classic</strong> token with the <code>repo</code> scope, paste it in, and click <strong>Save</strong>.</p>
+          <p><a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=PR%20Tracker" target="_blank" rel="noopener">Create a token with repo scope pre-selected ↗</a></p>
+        </div>
+      </li>
+      <li>
+        <h3>Authorize the token for our org's SSO</h3>
+        <div class="detail">
+          <p>On the token list, click <strong>Configure SSO</strong> next to the new token, then <strong>Authorize</strong> for <code>gdncomm</code>. If you skip this, the dashboard shows a "SAML enforcement" error and no private repos.</p>
+        </div>
+      </li>
+    </ol>
+    <div class="note">
+      <p><strong>Your token stays on your computer.</strong> It's saved in this Chrome profile's extension storage and sent only to <code>api.github.com</code>. There's no server in between. The extension only reads from GitHub. It never comments, approves or pushes.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="notify">
+    <h2 id="notify">Notifications</h2>
+    <p>Each refresh (every 15 minutes by default, or when you click Refresh) is compared with the previous one. You get a desktop alert for:</p>
+    <ul class="plain">
+      <li><strong>On your PRs:</strong> a new comment, a reviewer replying again in a thread, the PR getting approved or getting changes requested</li>
+      <li><strong>On PRs you review:</strong> a new review request, one of your comments getting fixed or answered</li>
+    </ul>
+    <p class="muted">Clicking an alert opens that comment on GitHub. If more than four things change at once, you get one summary instead. You can turn alerts off or change the refresh interval in Settings.</p>
+    <div class="note"><p><strong>On macOS</strong>, allow Chrome to show notifications first: System Settings → Notifications → Google Chrome → Allow notifications. Without this, alerts silently don't appear.</p></div>
+  </section>
+
+  <section aria-labelledby="update">
+    <h2 id="update">Updating to a new version</h2>
+    <p>Download the new zip and unzip it <em>over the same folder</em>, replacing the old files. Then click the reload arrow on the PR Tracker card at <code>chrome://extensions</code>. Keeping the same folder keeps your token and settings. A new folder counts as a new extension and starts empty.</p>
+  </section>
+
+  <section aria-labelledby="trouble">
+    <h2 id="trouble">If something's off</h2>
+    <div>
+      <details>
+        <summary>"Resource protected by organization SAML enforcement"</summary>
+        <div><p>The token isn't authorized for the org yet. Do step 6 (Configure SSO → Authorize), then click Refresh.</p></div>
+      </details>
+      <details>
+        <summary>"GitHub rejected the token (401)"</summary>
+        <div><p>The token expired or was deleted. Create a new one, open Settings and paste it in. Tokens with no expiry avoid this, if your policy allows them.</p></div>
+      </details>
+      <details>
+        <summary>Chrome warns about developer-mode extensions at startup</summary>
+        <div><p>This is expected for anything loaded unpacked. Click away or close it. The extension keeps working.</p></div>
+      </details>
+      <details>
+        <summary>No notifications</summary>
+        <div>
+          <p>Check these three things: the macOS setting above; "Desktop notifications for updates" is ticked in Settings; Chrome is running (checks only happen while it's open).</p>
+          <p>Also, the first fetch after installing never sends alerts. That's on purpose, so you aren't flooded with everything that already exists.</p>
+        </div>
+      </details>
+      <details>
+        <summary>A comment says "Commit after" but I did fix it</summary>
+        <div><p>Statuses are a best guess. For the tracker to count it as fixed, resolve the thread on GitHub or reply with something like "Done in abc1234". Replies in Indonesian (sudah, diperbaiki) count too.</p></div>
+      </details>
+      <details>
+        <summary>A bot account shows up as a person</summary>
+        <div><p>Some CI accounts are regular user accounts. Add their logins under <strong>Extra bot logins</strong> in Settings.</p></div>
+      </details>
+    </div>
+  </section>
+
+  <section aria-labelledby="perms">
+    <h2 id="perms">What it can access</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Permission</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td><code>storage</code></td><td>Your token, settings and the last fetched list</td></tr>
+          <tr><td><code>alarms</code></td><td>Refreshing in the background</td></tr>
+          <tr><td><code>notifications</code></td><td>Desktop alerts for updates</td></tr>
+          <tr><td><code>api.github.com</code></td><td>The one read-only GraphQL query that fetches your PRs</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">It can't see your tabs, browsing history, or any other website.</p>
+  </section>
+
+  <footer>
+    Maintained by @gdncomm-ariantoly. Report problems or ideas to the maintainer.
+  </footer>
+</div>
+
+<script>
+  document.querySelectorAll('[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const el = document.getElementById(btn.dataset.copy)
+      const text = el.textContent
+      const done = () => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy' }, 1500) }
+      const fallback = () => {
+        const range = document.createRange()
+        range.selectNodeContents(el)
+        const sel = window.getSelection()
+        sel.removeAllRanges()
+        sel.addRange(range)
+        btn.textContent = 'Press ⌘C'
+      }
+      try {
+        navigator.clipboard.writeText(text).then(done, fallback)
+      } catch {
+        fallback()
+      }
+    })
+  })
+</script>
