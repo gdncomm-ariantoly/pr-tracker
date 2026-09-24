@@ -169,6 +169,26 @@ function excerpt(body) {
 }
 
 /**
+ * The author's GitHub avatar, or their initial when GitHub gave none.
+ * @param {string} login
+ * @param {string} [url]
+ */
+function avatar(login, url) {
+  if (url && /^https:\/\//.test(url)) {
+    const img = document.createElement('img')
+    img.className = 'avatar'
+    img.src = url
+    img.alt = ''
+    img.loading = 'lazy'
+    return img
+  }
+  const span = document.createElement('span')
+  span.className = 'avatar'
+  span.textContent = (login[0] ?? '?').toUpperCase()
+  return span
+}
+
+/**
  * @param {Finding} f
  * @param {string} viewer
  */
@@ -183,13 +203,24 @@ function renderFinding(f, viewer) {
   status.textContent = STATUS_LABEL[f.status]
   status.className = `status s-${f.status}`
   setText(li, '.who', f.author === viewer ? `${f.author} (you)` : f.author)
-  const where =
+  li.querySelector('.avatar')?.replaceWith(avatar(f.author, f.avatar))
+  const action =
     f.kind === 'inline'
-      ? `${f.path}${f.line ? `:${f.line}` : ''}${f.replies ? ` · ${f.replies} repl${f.replies === 1 ? 'y' : 'ies'}` : ''}`
+      ? 'commented on'
       : f.kind === 'review'
-        ? `review${f.reviewState && f.reviewState !== 'COMMENTED' ? ` · ${f.reviewState.toLowerCase().replace('_', ' ')}` : ''}`
-        : 'conversation'
-  setText(li, '.where', where)
+        ? f.reviewState === 'APPROVED'
+          ? 'approved'
+          : f.reviewState === 'CHANGES_REQUESTED'
+            ? 'requested changes'
+            : 'reviewed'
+        : 'commented'
+  setText(li, '.action', action)
+  const where = li.querySelector('.where')
+  if (where) {
+    where.textContent = f.kind === 'inline' ? `${f.path}${f.line ? `:${f.line}` : ''}` : ''
+    where.toggleAttribute('hidden', f.kind !== 'inline')
+    if (f.path) where.setAttribute('title', f.path)
+  }
   const when = /** @type {HTMLAnchorElement} */ (li.querySelector('.when'))
   when.textContent = ago(f.createdAt)
   when.href = f.url
@@ -206,13 +237,16 @@ function renderFinding(f, viewer) {
     head.className = 'c-head'
     const who = document.createElement('strong')
     who.textContent = c.author === viewer ? `${c.author} (you)` : c.author
+    const verb = document.createElement('span')
+    verb.className = 'muted'
+    verb.textContent = 'replied'
     const when = document.createElement('a')
     when.className = 'muted'
     when.href = c.url
     when.target = '_blank'
     when.rel = 'noopener'
     when.textContent = ago(c.createdAt)
-    head.append(who, when)
+    head.append(avatar(c.author, c.avatar), who, verb, when)
     const text = document.createElement('div')
     text.className = 'markdown-body'
     text.append(renderComment(c.bodyHTML, c.body))
@@ -220,7 +254,8 @@ function renderFinding(f, viewer) {
     convo.append(item)
   }
   convo.hidden = !f.conversation?.length
-  setText(li, '.evidence', f.evidence)
+  setText(li, '.evidence-text', f.evidence)
+  li.querySelector('.evidence')?.toggleAttribute('hidden', !f.evidence)
 
   // Fixed and no-action comments fold to one line; the header toggles them.
   const fold = /** @type {HTMLButtonElement} */ (li.querySelector('.fold'))
@@ -324,7 +359,19 @@ function renderPR(pr, viewer, showRepo) {
     // Unfixed first — those are what need doing — then no-action, then fixed.
     const rank = (/** @type {Finding} */ f) => (f.fixed ? 2 : f.noAction ? 1 : 0)
     const ordered = [...pr.findings].sort((a, b) => rank(a) - rank(b))
-    for (const f of ordered) list.append(renderFinding(f, viewer))
+    const groups = ['Needs attention', 'No action needed', 'Fixed']
+    let current = -1
+    for (const f of ordered) {
+      if (rank(f) !== current) {
+        current = rank(f)
+        const n = ordered.filter((x) => rank(x) === current).length
+        const head = document.createElement('li')
+        head.className = `f-group g-${current}`
+        head.textContent = `${groups[current]} · ${n}`
+        list.append(head)
+      }
+      list.append(renderFinding(f, viewer))
+    }
   }
   return el
 }

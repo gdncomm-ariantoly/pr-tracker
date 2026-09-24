@@ -125,18 +125,22 @@
       <li class="finding">
         <div class="f-head">
           <button type="button" class="fold" aria-expanded="true" hidden></button>
-          <span class="status"></span>
+          <span class="avatar"></span>
           <strong class="who"></strong>
-          <span class="where muted"></span>
+          <span class="action muted"></span>
+          <code class="where"></code>
           <span class="spacer"></span>
+          <span class="status"></span>
           <button type="button" class="mark"></button>
           <a class="when muted" target="_blank" rel="noopener"></a>
         </div>
         <p class="preview muted" hidden></p>
-        <div class="body markdown-body"></div>
-        <button type="button" class="more" hidden>Show more</button>
-        <ol class="conversation"></ol>
-        <p class="evidence muted"></p>
+        <div class="f-main">
+          <div class="body markdown-body"></div>
+          <button type="button" class="more" hidden>Show more</button>
+          <ol class="conversation"></ol>
+        </div>
+        <p class="evidence"><span class="why">Why this status</span><span class="evidence-text"></span></p>
       </li>
     </template>
 

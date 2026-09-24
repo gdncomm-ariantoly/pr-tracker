@@ -7,6 +7,7 @@
  *
  *   npm install -D @playwright/test && npx playwright install chromium
  *   node tools/verify-extension.mjs [--headed]
+ *   SHOT=card.png node tools/verify-extension.mjs   # also save a screenshot of one PR's comments
  */
 
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -213,8 +214,11 @@ async function verify(context, id) {
   const first = withFindings.locator('.finding').first()
   check('finding shows a status', ((await first.locator('.status').textContent()) ?? '').length > 0)
   check('finding shows its author', ((await first.locator('.who').textContent()) ?? '').length > 0)
-  check('finding shows evidence', ((await first.locator('.evidence').textContent()) ?? '').length > 0)
+  check('finding shows evidence', ((await first.locator('.evidence-text').textContent()) ?? '').length > 0)
+  check('finding shows an avatar', (await first.locator('.f-head .avatar').count()) === 1)
+  check('comments sit under a group heading', ((await withFindings.locator('.f-group').first().textContent()) ?? '').includes('·'))
   check('finding links to GitHub', ((await first.locator('a.when').getAttribute('href')) ?? '').startsWith('https://github.com/'))
+  if (process.env.SHOT) await withFindings.screenshot({ path: process.env.SHOT })
   check('bot comments are not listed', (await page.locator('.finding .who', { hasText: 'productivity-tools-services' }).count()) === 0)
 
   // Fixed comments start folded to one line; clicking the header opens them.

@@ -136,30 +136,53 @@ a.chip.build:hover { text-decoration: underline; }
 .b-cancelled, .b-skipped, .b-unknown { background: var(--gray-bg); color: var(--gray-fg); }
 .b-unknown::before { display: none; }
 
-.findings { list-style: none; margin: 0; padding: 0 16px 12px 40px; display: grid; gap: 8px; }
-.finding { border-left: 3px solid var(--bad-fg); padding: 6px 12px; background: var(--bg); border-radius: 0 6px 6px 0; }
+.findings { list-style: none; margin: 0; padding: 4px 20px 20px; display: grid; gap: 14px; }
+.f-group { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 10px 0 -4px; }
+.f-group:first-child { margin-top: 4px; }
+.f-group.g-0 { color: var(--bad-fg); }
+.f-group.g-2 { color: var(--ok-fg); }
+
+/* one comment = one GitHub-style card */
+.finding { border: 1px solid var(--line); border-left: 4px solid var(--bad-fg); border-radius: 8px; background: var(--card, var(--bg)); overflow: hidden; }
 .finding.fixed { border-left-color: var(--ok-fg); }
 .finding.no-action { border-left-color: var(--line); }
-.finding.fixed .f-head, .finding.no-action .f-head { cursor: pointer; }
-.fold { border: 0; background: none; padding: 0 2px; color: var(--muted); font-size: 11px; width: 14px; }
-.finding.folded { padding-block: 4px; }
-.finding.folded .body, .finding.folded .more, .finding.folded .conversation, .finding.folded .evidence { display: none; }
-.finding.folded .preview { display: block !important; }
-.preview { margin: 2px 0 0 20px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.finding.no-action .body { opacity: .75; }
-.mark { font-size: 11px; padding: 1px 8px; border-radius: 999px; color: var(--muted); }
-.mark:hover { color: var(--fg); border-color: var(--muted); }
 .finding[data-status=replied], .finding[data-status=commit-after] { border-left-color: var(--warn-fg); }
-.f-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
-.where { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; word-break: break-all; }
-.body { margin: 6px 0 2px; }
-.body.clipped { max-height: 16em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
-.more { font-size: 12px; padding: 0 10px; margin-bottom: 4px; }
-.conversation { list-style: none; margin: 6px 0; padding: 0 0 0 12px; border-left: 2px solid var(--line); display: grid; gap: 8px; }
-.conversation .c-head { display: flex; gap: 8px; align-items: baseline; font-size: 12px; }
+.f-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; padding: 10px 14px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.f-head .who { font-weight: 600; }
+.f-head .action { font-size: 13px; }
+.f-head .when { font-size: 12px; }
+.finding.fixed .f-head, .finding.no-action .f-head { cursor: pointer; }
+.avatar { width: 22px; height: 22px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; font-size: 11px; font-weight: 600; background: var(--gray-bg); color: var(--gray-fg); object-fit: cover; }
+.where { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; padding: 1px 6px; border-radius: 6px; background: var(--gray-bg); word-break: break-all; }
+.f-main { padding: 14px 16px; }
+.body { margin: 0; }
+.body.clipped { max-height: 18em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.more { font-size: 12px; padding: 2px 12px; margin-top: 8px; }
+.finding.no-action .body { opacity: .8; }
+.mark { font-size: 11px; padding: 2px 10px; border-radius: 999px; color: var(--muted); }
+.mark:hover { color: var(--fg); border-color: var(--muted); }
+.fold { border: 0; background: none; padding: 0 2px; color: var(--muted); font-size: 12px; width: 16px; }
+
+/* replies: nested, each with its own header like GitHub */
+.conversation { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: 8px; }
+.conversation > li { padding: 12px 14px; }
+.conversation > li + li { border-top: 1px solid var(--line); }
+.conversation .c-head { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-bottom: 8px; }
+.conversation .c-head a { font-size: 12px; }
+.conversation .avatar { width: 20px; height: 20px; }
+
+/* why-this-status footer */
+.evidence { margin: 0; padding: 10px 16px; font-size: 12.5px; line-height: 1.5; color: var(--muted); background: var(--bg); border-top: 1px solid var(--line); }
+.evidence .why { font-weight: 600; margin-right: 8px; color: var(--fg); }
+
+/* folded (fixed / no action): header plus a one-line preview */
+.finding.folded .f-head { border-bottom: 0; }
+.finding.folded .f-main, .finding.folded .evidence { display: none; }
+.finding.folded .preview { display: block !important; }
+.preview { margin: 0; padding: 0 14px 10px 44px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; background: var(--bg); }
 
 /* GitHub-flavoured rendering of bodyHTML */
-.markdown-body { font-size: 14px; line-height: 1.5; word-wrap: break-word; overflow-wrap: anywhere; }
+.markdown-body { font-size: 14px; line-height: 1.6; word-wrap: break-word; overflow-wrap: anywhere; }
 .markdown-body > :first-child { margin-top: 0; }
 .markdown-body > :last-child { margin-bottom: 0; }
 .markdown-body p, .markdown-body ul, .markdown-body ol, .markdown-body blockquote, .markdown-body pre, .markdown-body table, .markdown-body details { margin: 0 0 10px; }
@@ -198,7 +221,6 @@ a.chip.build:hover { text-decoration: underline; }
 .markdown-body .blob-code-addition { background: var(--ok-bg); }
 .markdown-body .blob-code-deletion { background: var(--bad-bg); }
 .markdown-body .blob-num { color: var(--muted); padding-right: 8px; text-align: right; }
-.evidence { margin: 0; font-size: 12px; font-style: italic; }
 
 .status { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
 .s-resolved, .s-outdated, .s-fixed-reply { background: var(--ok-bg); color: var(--ok-fg); }
