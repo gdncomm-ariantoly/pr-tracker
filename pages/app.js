@@ -2,7 +2,7 @@ import { groupPRs, STALE_DAYS } from '../lib/group.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
-import { jenkinsJobUrl, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
+import { jenkinsJobUrl, jenkinsOrigin, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -38,7 +38,11 @@ const state = {
   /** @type {import('../lib/overrides.js').Overrides} */ overrides: {},
   jenkinsTemplate: '',
   jenkinsHidden: false,
+  jenkinsGranted: false,
 }
+
+/** @param {string} origin */
+const jenkinsAllowed = (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] })
 
 try {
   const saved = JSON.parse(localStorage.getItem('ui') ?? '{}')
@@ -101,11 +105,11 @@ function buildChip(build) {
 }
 
 /** Link to the PR's Jenkins job when GitHub doesn't report the build to this token. */
-function jobChip(/** @type {string} */ url) {
+function jobChip(/** @type {string} */ url, text = 'Jenkins ↗', title = 'Build status not visible to your token — opens the PR job in Jenkins') {
   const el = document.createElement('a')
   el.className = 'chip build b-unknown'
-  el.textContent = 'Jenkins ↗'
-  el.title = 'Build status not visible to your token — opens the PR job in Jenkins'
+  el.textContent = text
+  el.title = title
   el.href = url
   el.target = '_blank'
   el.rel = 'noopener'
@@ -208,7 +212,10 @@ function renderPR(pr, viewer, showRepo) {
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
   if (pr.build) chips.append(buildChip(pr.build))
-  else if (state.jenkinsHidden) {
+  else if (pr.jenkins === 'login') {
+    const job = jenkinsJobUrl(state.jenkinsTemplate, pr)
+    if (job) chips.append(jobChip(job, 'Jenkins: sign in ↗', 'Sign in to Jenkins in this browser, then Refresh, to see the status'))
+  } else if (state.jenkinsHidden && !state.snapshot?.jenkinsChecked) {
     // Only guess the job link when GitHub is hiding builds from the token; a PR
     // whose builds are visible but absent (deployment repos) has no job to link.
     const job = jenkinsJobUrl(state.jenkinsTemplate, pr)
@@ -257,6 +264,14 @@ function paint() {
   const warnings = (snap?.warnings ?? []).filter((w) => !(state.jenkinsTemplate && w.startsWith(JENKINS_HIDDEN)))
   warn.hidden = !warnings.length
   warn.textContent = warnings.join(' ')
+
+  // Jenkins: offer access while builds are hidden; ask for a sign-in when Jenkins wants one.
+  const origin = jenkinsOrigin(state.jenkinsTemplate)
+  const access = $('jenkins-access')
+  access.hidden = !(origin && state.jenkinsHidden && !state.jenkinsGranted)
+  const login = $('jenkins-login')
+  login.hidden = !(origin && snap?.jenkinsLogin)
+  if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-login-link')).href = `${origin}/`
 
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
   $('fetched').textContent = snap ? `updated ${ago(snap.fetchedAt)}` : ''
@@ -323,7 +338,7 @@ async function doRefresh() {
   btn.disabled = true
   btn.textContent = 'Refreshing…'
   try {
-    state.snapshot = await refresh()
+    state.snapshot = await refresh({ jenkinsAllowed })
     showError(null)
     paint()
   } catch (error) {
@@ -359,6 +374,22 @@ $('settings').addEventListener('submit', async (event) => {
   $('toggle-settings').setAttribute('aria-expanded', 'false')
   await doRefresh()
 })
+
+/** Ask for the Jenkins host permission — must run inside the click, as a user gesture. */
+async function grantJenkins() {
+  const origin = jenkinsOrigin(state.jenkinsTemplate)
+  if (!origin) return
+  try {
+    state.jenkinsGranted = await chrome.permissions.request({ origins: [`${origin}/*`] })
+  } catch (error) {
+    showError(`Can't request access to ${origin}: ${error instanceof Error ? error.message : String(error)}. Only *.gdn-app.com Jenkins hosts are supported.`)
+    return
+  }
+  paint()
+  if (state.jenkinsGranted) await doRefresh()
+}
+$('jenkins-grant').addEventListener('click', () => void grantJenkins())
+$('jenkins-grant-settings').addEventListener('click', () => void grantJenkins())
 
 for (const btn of document.querySelectorAll('[data-tab]')) {
   btn.addEventListener('click', () => {
@@ -412,6 +443,8 @@ async function init() {
   input('notify').checked = settings.notify
   input('jenkins').value = settings.jenkinsTemplate
   state.jenkinsTemplate = settings.jenkinsTemplate
+  const origin = jenkinsOrigin(settings.jenkinsTemplate)
+  state.jenkinsGranted = origin ? await jenkinsAllowed(origin) : false
   if (settings.token) input('token').placeholder = 'Token saved — paste a new one to replace it'
   showError(typeof lastError === 'string' ? lastError : null)
   paint()

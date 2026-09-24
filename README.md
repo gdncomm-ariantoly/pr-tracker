@@ -23,6 +23,8 @@ Jenkins reports each PR build to GitHub (a check run named "Jenkins CI"). The ex
 
 If GitHub hides builds from the token (fine-grained tokens may not see Jenkins check runs even with Commit statuses: Read), each PR gets a plain **Jenkins ↗** link built from the *Jenkins job link* setting (default `…/job/TRFCEE/job/{repo}/job/PR-{number}/`) instead, and no banner nags about it.
 
+**Status straight from Jenkins.** When builds are hidden, a blue banner offers *Show build status from Jenkins*. Accepting grants the optional host permission for the Jenkins host (`*.gdn-app.com`). From then on each refresh asks `…/PR-{number}/lastBuild/api/json` using your **own Jenkins sign-in in this browser**: no Jenkins token is stored. Not signed in (Jenkins answers 403): the chip says *Jenkins: sign in ↗* and a banner links to Jenkins. No job (404, e.g. deployment repos): no chip. At most 6 requests run at once.
+
 ### Layout
 
 Each tab is grouped by service (the repository name without `gdncomm/`), alphabetically, newest PR first. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
@@ -61,7 +63,7 @@ No build step — the extension is plain ES modules and loads as it sits.
 npm install
 npm test            # unit tests — no browser needed
 npm run typecheck   # JSDoc types via tsc --noEmit; nothing is compiled
-npm run verify      # loads the extension into a real Chromium and drives it
+npm run verify      # loads the extension into a real Chromium and drives it (incl. tools/verify-jenkins.mjs)
 npm run package     # Web Store zip
 ```
 
@@ -77,6 +79,7 @@ never loaded, or CSS that quietly defeated `element.hidden`.
 | `alarms` | Periodic refresh for the badge and notifications |
 | `notifications` | Desktop alerts for new comments, approvals, review requests and fixes |
 | host `https://api.github.com/*` | The one GraphQL call that fetches the PRs |
+| optional host `https://*.gdn-app.com/*` | Only if you click *Show build status from Jenkins*: reads each PR's last build from Jenkins with your session |
 
 ## Limits
 

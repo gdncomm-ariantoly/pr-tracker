@@ -75,6 +75,7 @@ button:disabled { opacity: .6; cursor: default; }
 .banner { max-width: 960px; margin: 16px auto 0; padding: 10px 14px; border-radius: 8px; }
 .banner.error { background: var(--bad-bg); color: var(--bad-fg); }
 .banner.warning { background: var(--warn-bg); color: var(--warn-fg); }
+.banner.info { background: var(--info-bg); color: var(--info-fg); display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 
 .tabs {
   max-width: 960px; margin: 16px auto 8px; padding: 0 16px;

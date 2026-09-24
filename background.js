@@ -24,7 +24,9 @@ chrome.runtime.onStartup.addListener(() => {
 })
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM) void refresh().catch(() => {})
+  if (alarm.name === ALARM) {
+    void refresh({ jenkinsAllowed: (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] }) }).catch(() => {})
+  }
 })
 
 chrome.storage.onChanged.addListener((changes, area) => {

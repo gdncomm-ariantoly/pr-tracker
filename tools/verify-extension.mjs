@@ -293,6 +293,7 @@ async function verify(context, id) {
   check('hidden build status falls back to a Jenkins job link on every PR', (await fallback.count()) === (await page.locator('article.pr').count()))
   check('fallback link follows the job template', /\/job\/PR-\d+\/$/.test((await fallback.first().getAttribute('href')) ?? ''))
   check('no banner for a hidden build status when the link covers it', await page.isHidden('#warning'))
+  check('offers reading build status from Jenkins', await page.isVisible('#jenkins-access'))
   mode = 'ok'
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
