@@ -1,4 +1,5 @@
 import { groupPRs, STALE_DAYS } from '../lib/group.js'
+import { renderComment } from './markdown.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
@@ -118,6 +119,29 @@ function jobChip(/** @type {string} */ url, text = 'Jenkins ↗', title = 'Build
   return el
 }
 
+/**
+ * Long comments (AI reviews run to pages) start clipped with a "Show more".
+ * Measured after layout, since only the browser knows the rendered height.
+ *
+ * @param {HTMLElement} body
+ * @param {HTMLButtonElement} button
+ */
+function collapsible(body, button) {
+  body.classList.add('clipped')
+  requestAnimationFrame(() => {
+    if (body.scrollHeight <= body.clientHeight + 4) {
+      body.classList.remove('clipped')
+      return
+    }
+    button.hidden = false
+    button.addEventListener('click', (event) => {
+      event.preventDefault()
+      const open = body.classList.toggle('clipped') === false
+      button.textContent = open ? 'Show less' : 'Show more'
+    })
+  })
+}
+
 /** @param {number} n */
 function countBadge(n) {
   const el = document.createElement('span')
@@ -166,7 +190,32 @@ function renderFinding(f, viewer) {
   when.textContent = ago(f.createdAt)
   when.href = f.url
   when.title = new Date(f.createdAt).toLocaleString()
-  setText(li, '.body', excerpt(f.body) || '(no text)')
+  const body = /** @type {HTMLElement} */ (li.querySelector('.body'))
+  body.append(renderComment(f.bodyHTML, excerpt(f.body)))
+  collapsible(body, /** @type {HTMLButtonElement} */ (li.querySelector('.more')))
+
+  // The rest of the thread, as on GitHub: each reply with its author.
+  const convo = /** @type {HTMLElement} */ (li.querySelector('.conversation'))
+  for (const c of f.conversation ?? []) {
+    const item = document.createElement('li')
+    const head = document.createElement('div')
+    head.className = 'c-head'
+    const who = document.createElement('strong')
+    who.textContent = c.author === viewer ? `${c.author} (you)` : c.author
+    const when = document.createElement('a')
+    when.className = 'muted'
+    when.href = c.url
+    when.target = '_blank'
+    when.rel = 'noopener'
+    when.textContent = ago(c.createdAt)
+    head.append(who, when)
+    const text = document.createElement('div')
+    text.className = 'markdown-body'
+    text.append(renderComment(c.bodyHTML, c.body))
+    item.append(head, text)
+    convo.append(item)
+  }
+  convo.hidden = !f.conversation?.length
   setText(li, '.evidence', f.evidence)
 
   // Manual override: only for comments still counted as unfixed, or to undo one.

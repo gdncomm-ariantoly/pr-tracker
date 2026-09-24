@@ -208,6 +208,17 @@ async function verify(context, id) {
   check('finding links to GitHub', ((await first.locator('a.when').getAttribute('href')) ?? '').startsWith('https://github.com/'))
   check('bot comments are not listed', (await page.locator('.finding .who', { hasText: 'productivity-tools-services' }).count()) === 0)
 
+  // Comments render like GitHub (bodyHTML), and hostile HTML is neutralised.
+  if (await page.locator('.markdown-body table').count()) {
+    check('comments render GitHub formatting (code, tables)', (await page.locator('.markdown-body code').count()) > 0)
+    const pwned = await page.evaluate(() => /** @type {any} */ (window).__pwned ?? null)
+    check('no script, event handler or javascript: link survives', pwned === null && (await page.locator('.markdown-body script, .markdown-body [onerror], .markdown-body a[href^="javascript:"]').count()) === 0, String(pwned))
+    check('relative GitHub links point at github.com and open in a new tab', (await page.locator('.markdown-body a', { hasText: 'relative' }).first().getAttribute('href')) === 'https://github.com/gdncomm/api/pull/1')
+  }
+  if (await page.locator('.conversation li').count()) {
+    check('thread replies show under the comment', ((await page.locator('.conversation li').first().textContent()) ?? '').length > 0)
+  }
+
   // Manual "No action needed" on an unfixed comment: recount, survive reload, undo.
   const firstUnfixed = page.locator('article.pr').filter({ has: page.locator('.chip.c-pending') }).first()
   if (await firstUnfixed.count()) {

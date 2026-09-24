@@ -62,7 +62,8 @@
                 "body": "Please add a test for cache eviction.",
                 "createdAt": "2026-09-21T05:00:00Z",
                 "url": "https://github.com/acme/api/pull/1#c3",
-                "state": "CHANGES_REQUESTED"
+                "state": "CHANGES_REQUESTED",
+                "bodyHTML": "<p>Please add a test for cache eviction.</p>"
               }
             ]
           },
@@ -85,7 +86,8 @@
                       },
                       "body": "TTL should be a Duration, not int seconds.",
                       "createdAt": "2026-09-20T05:00:00Z",
-                      "url": "https://github.com/acme/api/pull/1#c4"
+                      "url": "https://github.com/acme/api/pull/1#c4",
+                      "bodyHTML": "<p>TTL should be a <code>Duration</code>, not int seconds.</p><table><thead><tr><th>Now</th><th>Better</th></tr></thead><tbody><tr><td><code>int</code></td><td><code>Duration</code></td></tr></tbody></table>"
                     },
                     {
                       "id": "C5",
@@ -117,7 +119,8 @@
                       },
                       "body": "Could this be null when the key is missing?",
                       "createdAt": "2026-09-20T05:05:00Z",
-                      "url": "https://github.com/acme/api/pull/1#c7"
+                      "url": "https://github.com/acme/api/pull/1#c7",
+                      "bodyHTML": "<p>Could this be null when the key is missing?</p><img src=\"x\" onerror=\"window.__pwned=1\"><a href=\"javascript:window.__pwned=2\">click</a><script>window.__pwned=3</script><a href=\"/gdncomm/api/pull/1\">relative</a>"
                     },
                     {
                       "id": "C8",
