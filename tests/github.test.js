@@ -64,6 +64,14 @@ describe('partial errors', () => {
     assert.equal(s.warnings?.length, 1, 'deduplicated')
     assert.match(s.warnings?.[0] ?? '', /SAML.*Configure SSO/)
   })
+  it('one unreadable PR does not blank the dashboard', () => {
+    // A comment without createdAt: nothing GitHub should send, but analysis throws on it.
+    const bad = { id: 'X', author: { login: 'bob', __typename: 'User' }, body: 'x', url: 'u' }
+    const broken = { ...node('B1', '2026-01-01T00:00:00Z'), comments: { nodes: [bad, { ...bad, id: 'Y' }] } }
+    const s = toSnapshot({ ...DATA, mine: { issueCount: 2, nodes: [broken, ...DATA.mine.nodes] } })
+    assert.equal(s.mine.length, 2)
+    assert.match(s.warnings?.[0] ?? '', /Could not read comments on o\/r#1/)
+  })
   it('has no warnings on a clean response', () => {
     assert.deepEqual(toSnapshot(DATA).warnings, [])
   })

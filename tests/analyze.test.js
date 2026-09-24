@@ -108,4 +108,19 @@ describe('analyzePR', () => {
     assert.deepEqual(byAuthor, { bob: 'fixed-reply', carol: 'open' })
     assert.equal(s.findings.length, 2, 'an empty COMMENTED review is not a finding')
   })
+
+  it('survives null connections and null nodes (hidden by SSO / deleted accounts)', () => {
+    const s = analyzePR(pr({
+      // @ts-expect-error — GitHub really sends these shapes
+      commits: { nodes: [null, { commit: null }, commit('2026-01-01T05:00:00Z')] },
+      // @ts-expect-error
+      comments: { nodes: [null, c(null, 'ghost says hi', '2026-01-01T01:00:00Z')] },
+      // @ts-expect-error
+      reviews: null,
+      // @ts-expect-error
+      reviewThreads: { nodes: [null, thread([null, c(bob, 'hm', '2026-01-01T01:00:00Z')])] },
+    }))
+    // The deleted ("ghost", author null) account cannot be judged human, so only bob's thread counts.
+    assert.deepEqual(s.findings.map((f) => [f.author, f.status]), [['bob', 'commit-after']])
+  })
 })
