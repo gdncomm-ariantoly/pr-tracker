@@ -112,7 +112,13 @@ async function verify(context, id) {
   let mode = 'ok'
   await context.route('https://api.github.com/graphql', async (route) => {
     authHeaders.push(route.request().headers().authorization ?? '')
-    if (mode === 'saml-partial') {
+    if (mode === 'jenkins-hidden') {
+      // What a fine-grained token gets: no build data on any PR, plus an error on it.
+      const strip = (/** @type {any} */ search) => ({ ...search, nodes: search.nodes.map((/** @type {any} */ n) => ({ ...n, head: { nodes: [{ commit: { statusCheckRollup: null } }] } })) })
+      const d = fixture.data
+      const errors = d.mine.nodes.map((/** @type {any} */ _, /** @type {number} */ i) => ({ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token', path: ['mine', 'nodes', i, 'head', 'nodes', 0, 'commit', 'statusCheckRollup'] }))
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { ...d, mine: strip(d.mine), requested: strip(d.requested), reviewed: strip(d.reviewed) }, errors }) })
+    } else if (mode === 'saml-partial') {
       const empty = { ...fixture.data, mine: { issueCount: 0, nodes: [] }, requested: { issueCount: 0, nodes: [] }, reviewed: { issueCount: 0, nodes: [] } }
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: empty, errors: [{ type: 'FORBIDDEN', message: 'Resource protected by organization SAML enforcement.' }] }) })
     } else if (mode === 'sso') {
@@ -151,7 +157,9 @@ async function verify(context, id) {
     const { snapshot } = await chrome.storage.local.get('snapshot')
     return /** @type {any} */ (snapshot).mine.filter((/** @type {any} */ p) => p.build).length
   })
-  check('a Jenkins chip on every PR with a build', (await page.locator('.chip.build').count()) === expectedBuilds, `${await page.locator('.chip.build').count()} vs ${expectedBuilds}`)
+  const statusChips = page.locator('.chip.build:not(.b-unknown)')
+  check('a Jenkins chip on every PR with a build', (await statusChips.count()) === expectedBuilds, `${await statusChips.count()} vs ${expectedBuilds}`)
+  check('no guessed Jenkins link while builds are visible', (await page.locator('.chip.b-unknown').count()) === 0)
   if (expectedBuilds) {
     const firstBuild = page.locator('a.chip.build').first()
     check('the chip links to Jenkins', /jenkins/i.test((await firstBuild.getAttribute('href')) ?? ''))
@@ -274,6 +282,18 @@ async function verify(context, id) {
   const silenced = await worker.evaluate(() => chrome.notifications.getAll())
   check('notifications can be switched off', Object.keys(silenced).length === 0, JSON.stringify(silenced))
   fixture.data = original
+  await page.click('#refresh')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+
+  // Build status hidden from the token: fall back to a Jenkins job link, no standing banner.
+  mode = 'jenkins-hidden'
+  await page.click('#refresh')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  const fallback = page.locator('a.chip.b-unknown')
+  check('hidden build status falls back to a Jenkins job link on every PR', (await fallback.count()) === (await page.locator('article.pr').count()))
+  check('fallback link follows the job template', /\/job\/PR-\d+\/$/.test((await fallback.first().getAttribute('href')) ?? ''))
+  check('no banner for a hidden build status when the link covers it', await page.isHidden('#warning'))
+  mode = 'ok'
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
 

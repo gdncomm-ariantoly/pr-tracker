@@ -303,7 +303,7 @@
       </details>
       <details>
         <summary>No Jenkins build shows on a PR</summary>
-        <div><p>Either the PR's latest commit hasn't reported a build to GitHub yet, or your token lacks <strong>Commit statuses: Read-only</strong>. Edit the token to add it (you don't need a new one), then click Refresh. If the banner mentions Commit statuses, that's the cause.</p></div>
+        <div><p>Either the PR's latest commit hasn't reported a build to GitHub yet, or GitHub is hiding builds from your token. Make sure the token has <strong>Commit statuses: Read-only</strong> (edit it, no new token needed) and click Refresh. If builds are still hidden, GitHub doesn't show Jenkins check runs to fine-grained tokens. Each PR then gets a plain <strong>Jenkins ↗</strong> link to its job instead of a pass/fail chip. The link pattern is in Settings.</p></div>
       </details>
       <details>
         <summary>A bot account shows up as a person</summary>

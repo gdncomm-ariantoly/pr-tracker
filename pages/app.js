@@ -1,7 +1,8 @@
 import { groupPRs, STALE_DAYS } from '../lib/group.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
-import { loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
+import { JENKINS_HIDDEN } from '../lib/github.js'
+import { jenkinsJobUrl, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -35,6 +36,8 @@ const state = {
   /** @type {Snapshot | null} */ snapshot: null,
   /** @type {Set<string>} */ open: new Set(),
   /** @type {import('../lib/overrides.js').Overrides} */ overrides: {},
+  jenkinsTemplate: '',
+  jenkinsHidden: false,
 }
 
 try {
@@ -94,6 +97,19 @@ function buildChip(build) {
     // A link inside <summary> would also expand/collapse the card.
     el.addEventListener('click', (event) => event.stopPropagation())
   }
+  return el
+}
+
+/** Link to the PR's Jenkins job when GitHub doesn't report the build to this token. */
+function jobChip(/** @type {string} */ url) {
+  const el = document.createElement('a')
+  el.className = 'chip build b-unknown'
+  el.textContent = 'Jenkins ↗'
+  el.title = 'Build status not visible to your token — opens the PR job in Jenkins'
+  el.href = url
+  el.target = '_blank'
+  el.rel = 'noopener'
+  el.addEventListener('click', (event) => event.stopPropagation())
   return el
 }
 
@@ -192,6 +208,12 @@ function renderPR(pr, viewer, showRepo) {
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
   if (pr.build) chips.append(buildChip(pr.build))
+  else if (state.jenkinsHidden) {
+    // Only guess the job link when GitHub is hiding builds from the token; a PR
+    // whose builds are visible but absent (deployment repos) has no job to link.
+    const job = jenkinsJobUrl(state.jenkinsTemplate, pr)
+    if (job) chips.append(jobChip(job))
+  }
   if (pr.isDraft) chips.append(chip('Draft', 'c-draft'))
   if (state.tab === 'toReview') chips.append(pr.requested ? chip('Review requested', 'c-req') : chip('Reviewed by you', 'c-muted'))
   if (pr.reviewDecision && DECISION_LABEL[pr.reviewDecision]) {
@@ -218,6 +240,7 @@ function renderPR(pr, viewer, showRepo) {
 
 function paint() {
   const snap = state.snapshot && applyOverrides(state.snapshot, state.overrides)
+  state.jenkinsHidden = !!snap?.warnings?.some((w) => w.startsWith(JENKINS_HIDDEN))
   const list = $('list')
   const empty = $('empty')
   list.replaceChildren()
@@ -230,8 +253,10 @@ function paint() {
   input('only-pending').checked = state.onlyPending
 
   const warn = $('warning')
-  warn.hidden = !snap?.warnings?.length
-  warn.textContent = snap?.warnings?.join(' ') ?? ''
+  // With a Jenkins link to fall back on, a hidden build status isn't worth a standing banner.
+  const warnings = (snap?.warnings ?? []).filter((w) => !(state.jenkinsTemplate && w.startsWith(JENKINS_HIDDEN)))
+  warn.hidden = !warnings.length
+  warn.textContent = warnings.join(' ')
 
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
   $('fetched').textContent = snap ? `updated ${ago(snap.fetchedAt)}` : ''
@@ -326,6 +351,7 @@ $('settings').addEventListener('submit', async (event) => {
     extraBots: parseList(/** @type {HTMLTextAreaElement} */ ($('bots')).value),
     refreshMinutes: Number(/** @type {HTMLSelectElement} */ ($('minutes')).value),
     notify: input('notify').checked,
+    jenkinsTemplate: input('jenkins').value.trim(),
   })
   input('token').value = ''
   input('token').placeholder = typed || current.token ? 'Token saved — paste a new one to replace it' : 'github_pat_…'
@@ -355,6 +381,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     state.snapshot = /** @type {Snapshot} */ (changes.snapshot.newValue)
     paint()
   }
+  if (changes.settings?.newValue) {
+    state.jenkinsTemplate = /** @type {any} */ (changes.settings.newValue).jenkinsTemplate ?? ''
+    paint()
+  }
   if (changes.overrides) {
     const next = changes.overrides.newValue
     state.overrides = next && typeof next === 'object' ? /** @type {any} */ (next) : {}
@@ -380,6 +410,8 @@ async function init() {
   const minutes = /** @type {HTMLSelectElement} */ ($('minutes'))
   minutes.value = String(settings.refreshMinutes)
   input('notify').checked = settings.notify
+  input('jenkins').value = settings.jenkinsTemplate
+  state.jenkinsTemplate = settings.jenkinsTemplate
   if (settings.token) input('token').placeholder = 'Token saved — paste a new one to replace it'
   showError(typeof lastError === 'string' ? lastError : null)
   paint()

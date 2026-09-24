@@ -21,6 +21,8 @@ Bots are excluded: GitHub App accounts, `*[bot]`, plus any logins you list in Se
 
 Jenkins reports each PR build to GitHub (a check run named "Jenkins CI"). The extension reads it from the PR's head commit, so no Jenkins login is needed, and shows a chip (e.g. **Jenkins #3 passed**, failed, running, queued) that links to the build. If several Jenkins jobs report, the worst one wins.
 
+If GitHub hides builds from the token (fine-grained tokens may not see Jenkins check runs even with Commit statuses: Read), each PR gets a plain **Jenkins ↗** link built from the *Jenkins job link* setting (default `…/job/TRFCEE/job/{repo}/job/PR-{number}/`) instead, and no banner nags about it.
+
 ### Layout
 
 Each tab is grouped by service (the repository name without `gdncomm/`), alphabetically, newest PR first. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.

@@ -84,6 +84,12 @@ describe('partial errors', () => {
     assert.match(s.warnings?.[0] ?? '', /missing Contents: Read-only/)
     assert.match(s.warnings?.[1] ?? '', /^2 PRs are in repositories your token doesn't cover/)
   })
+  it('says a hidden Jenkins build only affects the build chip', () => {
+    const msg = 'Resource not accessible by personal access token'
+    const s = toSnapshot(DATA, [], [{ message: msg, path: ['mine', 'nodes', 0, 'head', 'nodes', 0, 'commit', 'statusCheckRollup'] }])
+    assert.equal(s.warnings?.length, 1)
+    assert.match(s.warnings?.[0] ?? '', /^Jenkins build status is hidden.*Comments are unaffected/)
+  })
   it('falls back to the checklist when it cannot tell what was hidden', () => {
     const s = toSnapshot(DATA, [], [{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token' }])
     assert.match(s.warnings?.[0] ?? '', /pending approval.*Resource owner gdncomm/)
