@@ -1,0 +1,304 @@
+{
+  "data": {
+    "viewer": {
+      "login": "octo-me"
+    },
+    "rateLimit": {
+      "remaining": 4990,
+      "resetAt": "2026-09-24T02:00:00Z"
+    },
+    "mine": {
+      "issueCount": 2,
+      "nodes": [
+        {
+          "id": "P1",
+          "number": 101,
+          "title": "Add caching to product lookup",
+          "url": "https://github.com/acme/api/pull/101",
+          "isDraft": false,
+          "createdAt": "2026-09-20T01:00:00Z",
+          "updatedAt": "2026-09-23T01:00:00Z",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "author": {
+            "login": "octo-me",
+            "__typename": "User"
+          },
+          "repository": {
+            "nameWithOwner": "acme/api"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+                  "committedDate": "2026-09-21T03:00:00Z",
+                  "messageHeadline": "Use Duration for TTL"
+                }
+              }
+            ]
+          },
+          "comments": {
+            "nodes": [
+              {
+                "id": "C2",
+                "author": {
+                  "login": "ci-helper",
+                  "__typename": "Bot"
+                },
+                "body": "### Code Quality\n| … |",
+                "createdAt": "2026-09-20T02:00:00Z",
+                "url": "https://github.com/acme/api/pull/1#c2"
+              }
+            ]
+          },
+          "reviews": {
+            "nodes": [
+              {
+                "id": "C3",
+                "author": {
+                  "login": "carol",
+                  "__typename": "User"
+                },
+                "body": "Please add a test for cache eviction.",
+                "createdAt": "2026-09-21T05:00:00Z",
+                "url": "https://github.com/acme/api/pull/1#c3",
+                "state": "CHANGES_REQUESTED"
+              }
+            ]
+          },
+          "reviewThreads": {
+            "nodes": [
+              {
+                "id": "T6",
+                "isResolved": false,
+                "isOutdated": false,
+                "path": "src/Service.java",
+                "line": 42,
+                "resolvedBy": null,
+                "comments": {
+                  "nodes": [
+                    {
+                      "id": "C4",
+                      "author": {
+                        "login": "bob",
+                        "__typename": "User"
+                      },
+                      "body": "TTL should be a Duration, not int seconds.",
+                      "createdAt": "2026-09-20T05:00:00Z",
+                      "url": "https://github.com/acme/api/pull/1#c4"
+                    },
+                    {
+                      "id": "C5",
+                      "author": {
+                        "login": "octo-me",
+                        "__typename": "User"
+                      },
+                      "body": "Done in aaaa1234",
+                      "createdAt": "2026-09-21T03:10:00Z",
+                      "url": "https://github.com/acme/api/pull/1#c5"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "T9",
+                "isResolved": false,
+                "isOutdated": false,
+                "path": "src/Service.java",
+                "line": 42,
+                "resolvedBy": null,
+                "comments": {
+                  "nodes": [
+                    {
+                      "id": "C7",
+                      "author": {
+                        "login": "bob",
+                        "__typename": "User"
+                      },
+                      "body": "Could this be null when the key is missing?",
+                      "createdAt": "2026-09-20T05:05:00Z",
+                      "url": "https://github.com/acme/api/pull/1#c7"
+                    },
+                    {
+                      "id": "C8",
+                      "author": {
+                        "login": "octo-me",
+                        "__typename": "User"
+                      },
+                      "body": "No — getOrDefault guards it.",
+                      "createdAt": "2026-09-20T06:00:00Z",
+                      "url": "https://github.com/acme/api/pull/1#c8"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "T11",
+                "isResolved": true,
+                "isOutdated": false,
+                "path": "src/Service.java",
+                "line": 42,
+                "resolvedBy": {
+                  "login": "octo-me"
+                },
+                "comments": {
+                  "nodes": [
+                    {
+                      "id": "C10",
+                      "author": {
+                        "login": "carol",
+                        "__typename": "User"
+                      },
+                      "body": "nit: rename to cacheKey",
+                      "createdAt": "2026-09-20T05:10:00Z",
+                      "url": "https://github.com/acme/api/pull/1#c10"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "P2",
+          "number": 102,
+          "title": "Bump client library",
+          "url": "https://github.com/acme/api/pull/102",
+          "isDraft": false,
+          "createdAt": "2026-09-20T01:00:00Z",
+          "updatedAt": "2026-09-23T01:00:00Z",
+          "reviewDecision": "APPROVED",
+          "author": {
+            "login": "octo-me",
+            "__typename": "User"
+          },
+          "repository": {
+            "nameWithOwner": "acme/api"
+          },
+          "commits": {
+            "nodes": []
+          },
+          "comments": {
+            "nodes": [
+              {
+                "id": "C12",
+                "author": {
+                  "login": "ci-helper",
+                  "__typename": "Bot"
+                },
+                "body": "Build passed",
+                "createdAt": "2026-09-22T01:00:00Z",
+                "url": "https://github.com/acme/api/pull/1#c12"
+              }
+            ]
+          },
+          "reviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          }
+        }
+      ]
+    },
+    "requested": {
+      "issueCount": 1,
+      "nodes": [
+        {
+          "id": "P3",
+          "number": 103,
+          "title": "Refactor pricing rules",
+          "url": "https://github.com/acme/api/pull/103",
+          "isDraft": false,
+          "createdAt": "2026-09-20T01:00:00Z",
+          "updatedAt": "2026-09-23T01:00:00Z",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "author": {
+            "login": "bob",
+            "__typename": "User"
+          },
+          "repository": {
+            "nameWithOwner": "acme/api"
+          },
+          "commits": {
+            "nodes": []
+          },
+          "comments": {
+            "nodes": []
+          },
+          "reviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          }
+        }
+      ]
+    },
+    "reviewed": {
+      "issueCount": 1,
+      "nodes": [
+        {
+          "id": "P4",
+          "number": 104,
+          "title": "Fix timezone in reports",
+          "url": "https://github.com/acme/api/pull/104",
+          "isDraft": false,
+          "createdAt": "2026-09-20T01:00:00Z",
+          "updatedAt": "2026-09-23T01:00:00Z",
+          "reviewDecision": "REVIEW_REQUIRED",
+          "author": {
+            "login": "carol",
+            "__typename": "User"
+          },
+          "repository": {
+            "nameWithOwner": "acme/api"
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaad",
+                  "committedDate": "2026-09-22T04:00:00Z",
+                  "messageHeadline": "Use Asia/Jakarta zone"
+                }
+              }
+            ]
+          },
+          "comments": {
+            "nodes": []
+          },
+          "reviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": [
+              {
+                "id": "T15",
+                "isResolved": false,
+                "isOutdated": true,
+                "path": "src/Service.java",
+                "line": 42,
+                "resolvedBy": null,
+                "comments": {
+                  "nodes": [
+                    {
+                      "id": "C14",
+                      "author": {
+                        "login": "octo-me",
+                        "__typename": "User"
+                      },
+                      "body": "Should this use the store timezone?",
+                      "createdAt": "2026-09-22T02:00:00Z",
+                      "url": "https://github.com/acme/api/pull/1#c14"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

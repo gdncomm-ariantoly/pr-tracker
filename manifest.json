@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "PR Tracker",
+  "version": "0.1.0",
+  "description": "Lists your open PRs and PRs awaiting your review, with every human comment and whether it was fixed.",
+  "minimum_chrome_version": "116",
+  "action": {
+    "default_title": "Open PR Tracker"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://api.github.com/*"
+  ]
+}

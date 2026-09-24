@@ -1,0 +1,20 @@
+{
+  "name": "pr-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PR Tracker",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
+    "verify": "node tools/verify-extension.mjs",
+    "verify:headed": "node tools/verify-extension.mjs --headed",
+    "package": "sh tools/package-extension.sh ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/chrome": "^0.1.30",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

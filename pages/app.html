@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PR Tracker</title>
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <h1>PR Tracker</h1>
+      <span class="muted" id="viewer"></span>
+      <span class="spacer"></span>
+      <span class="muted" id="fetched"></span>
+      <button type="button" class="primary" id="refresh">Refresh</button>
+      <button type="button" id="toggle-settings" aria-expanded="false" aria-controls="settings">Settings</button>
+    </header>
+
+    <form class="settings" id="settings" hidden>
+      <label>
+        GitHub token
+        <input type="password" id="token" autocomplete="off" spellcheck="false" placeholder="ghp_… or github_pat_…" />
+        <small class="muted">Classic PAT with <code>repo</code> scope (or fine-grained with Pull requests: read). If your org uses SAML SSO, click <em>Configure SSO → Authorize</em> for it on the token page. Stored only in this browser (<code>chrome.storage.local</code>).</small>
+      </label>
+      <label>
+        Extra bot logins
+        <textarea id="bots" rows="2" spellcheck="false" placeholder="sonarcloud, jenkins-ci"></textarea>
+        <small class="muted">Accounts that are bots but show up as normal users. GitHub App bots and <code>*[bot]</code> are excluded automatically.</small>
+      </label>
+      <label>
+        Auto-refresh every
+        <select id="minutes">
+          <option value="0">never</option>
+          <option value="5">5 min</option>
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+          <option value="60">60 min</option>
+        </select>
+      </label>
+      <div class="row">
+        <button type="submit" class="primary">Save</button>
+        <a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=PR%20Tracker" target="_blank" rel="noopener">Create a token ↗</a>
+      </div>
+    </form>
+
+    <p class="banner error" id="error" role="alert" hidden></p>
+
+    <nav class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-toReview" data-tab="toReview" aria-selected="true">To review <span class="n" id="n-toReview">0</span></button>
+      <button type="button" role="tab" id="tab-mine" data-tab="mine" aria-selected="false">My PRs <span class="n" id="n-mine">0</span></button>
+      <span class="spacer"></span>
+      <label class="filter"><input type="checkbox" id="only-pending" /> Only PRs with unfixed comments</label>
+    </nav>
+
+    <main id="list" aria-live="polite"></main>
+    <p class="muted empty" id="empty" hidden></p>
+
+    <template id="pr-tpl">
+      <article class="pr">
+        <details>
+          <summary>
+            <div class="pr-head">
+              <a class="title" target="_blank" rel="noopener"></a>
+              <div class="meta">
+                <span class="repo"></span>
+                <span class="chips"></span>
+              </div>
+            </div>
+            <div class="tally"></div>
+          </summary>
+          <ol class="findings"></ol>
+        </details>
+      </article>
+    </template>
+
+    <template id="finding-tpl">
+      <li class="finding">
+        <div class="f-head">
+          <span class="status"></span>
+          <strong class="who"></strong>
+          <span class="where muted"></span>
+          <span class="spacer"></span>
+          <a class="when muted" target="_blank" rel="noopener"></a>
+        </div>
+        <p class="body"></p>
+        <p class="evidence muted"></p>
+      </li>
+    </template>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
