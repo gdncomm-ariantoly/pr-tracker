@@ -49,17 +49,18 @@ chrome.notifications.onClicked.addListener((id) => {
 async function notifyUpdates(prev, next) {
   const events = diffSnapshots(prev, next)
   if (events.length === 0 || !(await loadSettings()).notify) return
-  const base = { type: /** @type {const} */ ('basic'), iconUrl: 'icons/icon-128.png', contextMessage: 'PR Tracker' }
+  const base = { type: /** @type {const} */ ('basic'), iconUrl: 'icons/icon-128.png' }
   if (events.length > MAX_SEPARATE) {
     await chrome.notifications.create(`${APP}|summary:${Date.now()}`, {
       ...base,
       title: `${events.length} PR updates`,
+      contextMessage: 'Click to open PR Tracker',
       message: events.slice(0, 3).map((e) => e.title).join('\n') + (events.length > 3 ? '\n…' : ''),
     })
     return
   }
   for (const e of events) {
-    await chrome.notifications.create(`${e.url}|${e.key}`, { ...base, title: e.title, message: e.message })
+    await chrome.notifications.create(`${e.url}|${e.key}`, { ...base, title: e.title, contextMessage: e.context, message: e.message })
   }
 }
 

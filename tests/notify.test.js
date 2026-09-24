@@ -30,19 +30,20 @@ describe('diffSnapshots', () => {
   it('reports a new human comment on my PR', () => {
     const events = diffSnapshots(snap({ mine: [pr({})] }), snap({ mine: [pr({ findings: [finding({})] })] }))
     assert.equal(events.length, 1)
-    assert.equal(events[0].title, 'bob commented on api#1')
-    assert.match(events[0].message, /A\.java: rename this/)
+    assert.equal(events[0].title, 'New comment · api#1')
+    assert.equal(events[0].context, 'bob · A.java:1')
+    assert.equal(events[0].message, 'rename this')
   })
 
   it('reports a reviewer following up in an existing thread', () => {
     const prev = snap({ mine: [pr({ findings: [finding({})] })] })
-    const next = snap({ mine: [pr({ findings: [finding({ lastReviewerAt: '2026-01-02T00:00:00Z', lastReviewer: 'carol' })] })] })
-    assert.deepEqual(diffSnapshots(prev, next).map((e) => e.title), ['carol replied on api#1'])
+    const next = snap({ mine: [pr({ findings: [finding({ lastReviewerAt: '2026-01-02T00:00:00Z', lastReviewer: 'carol', lastReviewerBody: 'still null here' })] })] })
+    assert.deepEqual(diffSnapshots(prev, next).map((e) => [e.title, e.context, e.message]), [['New reply · api#1', 'carol · A.java:1', 'still null here']])
   })
 
   it('reports approval but not every decision change', () => {
     const prev = snap({ mine: [pr({})] })
-    assert.deepEqual(diffSnapshots(prev, snap({ mine: [pr({ reviewDecision: 'APPROVED' })] })).map((e) => e.title), ['api#1 approved'])
+    assert.deepEqual(diffSnapshots(prev, snap({ mine: [pr({ reviewDecision: 'APPROVED' })] })).map((e) => e.title), ['Approved · api#1'])
     assert.deepEqual(diffSnapshots(prev, snap({ mine: [pr({ reviewDecision: null })] })), [])
   })
 
@@ -52,7 +53,7 @@ describe('diffSnapshots', () => {
 
   it('reports a new review request', () => {
     const events = diffSnapshots(snap({}), snap({ toReview: [pr({ author: 'bob', requested: true })] }))
-    assert.deepEqual(events.map((e) => e.title), ['Review requested: api#1'])
+    assert.deepEqual(events.map((e) => e.title), ['Review requested · api#1'])
   })
 
   it('reports my comment being fixed or answered on a PR I review', () => {
@@ -62,10 +63,18 @@ describe('diffSnapshots', () => {
       { ...mine, status: 'fixed-reply', fixed: true },
       finding({ id: 'F2', author: 'carol', status: 'resolved', fixed: true }),
     ] })] })
-    assert.deepEqual(diffSnapshots(prev, fixed).map((e) => e.title), ['bob fixed your comment on api#1'], 'only my comments')
+    assert.deepEqual(diffSnapshots(prev, fixed).map((e) => e.title), ['Your comment fixed · api#1'], 'only my comments')
 
     const replied = snap({ toReview: [pr({ author: 'bob', findings: [{ ...mine, status: 'replied', evidence: 'bob replied: no' }] })] })
-    assert.deepEqual(diffSnapshots(prev, replied).map((e) => e.title), ['bob answered your comment on api#1'])
+    assert.deepEqual(diffSnapshots(prev, replied).map((e) => e.title), ['Reply to your comment · api#1'])
+  })
+
+  it('keeps the org prefix off logins and the path down to the file name', () => {
+    const f = finding({ author: 'gdncomm-ricardo-franclinton', path: 'product-feed-properties/src/main/java/com/gdn/product/feed/properties/FacebookClientProperties.java', line: 42, body: '**Nit:** use `Duration`' })
+    const [e] = diffSnapshots(snap({ mine: [pr({ repo: 'gdncomm/product-feed' })] }), snap({ mine: [pr({ repo: 'gdncomm/product-feed', findings: [f] })] }))
+    assert.equal(e.title, 'New comment · product-feed#1')
+    assert.equal(e.context, 'ricardo-franclinton · FacebookClientProperties.java:42')
+    assert.equal(e.message, 'Nit: use Duration')
   })
 
   it('says nothing when nothing changed', () => {
