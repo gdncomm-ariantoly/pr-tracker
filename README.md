@@ -21,6 +21,8 @@ Bots are excluded: GitHub App accounts, `*[bot]`, plus any logins you list in Se
 
 Jenkins reports each PR build to GitHub (a check run named "Jenkins CI"). The extension reads it from the PR's head commit, so no Jenkins login is needed, and shows a chip (e.g. **Jenkins #3 passed**, failed, running, queued) that links to the build. If several Jenkins jobs report, the worst one wins.
 
+Test-automation repos (`cucumber-*`) never show Jenkins: no status, no link, no lookup and no build notifications, even when GitHub reports a build.
+
 If GitHub hides builds from the token (fine-grained tokens may not see Jenkins check runs even with Commit statuses: Read), each PR gets a plain **Jenkins ↗** link built from the TRFCEE CI folder (`…/job/TRFCEE/job/{repo}/job/PR-{number}/`, `JENKINS_TEMPLATE` in `lib/store.js`) instead, and no banner nags about it.
 
 Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployment repos are run by other Jenkins instances that post nothing to PRs and don't let anonymous users list jobs. So they get a **Jenkins ↗** link to that Jenkins's search for the repo name (a unique match opens the job once you're signed in), with no status:

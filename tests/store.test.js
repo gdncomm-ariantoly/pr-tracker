@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it } from 'node:test'
 
-import { DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList, parseRepos } from '../lib/store.js'
+import { DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList, parseRepos, skipsJenkins } from '../lib/store.js'
 
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
@@ -41,4 +41,10 @@ it('links deployment repos to the Jenkins that runs them', () => {
   assert.equal(deployJenkinsLink({ repo: 'gdncomm/prod-infra-gdn-traffic-tracker-aggregator-mongo-updates' })?.host, 'jenkins-prod-infra.gdn-app.com')
   assert.equal(deployJenkinsLink({ repo: 'gdncomm/nonprod-rundeck-gdn-preprod' })?.host, 'jenkins-np-deploy.gdn-app.com')
   assert.equal(deployJenkinsLink({ repo: 'gdncomm/product-feed' }), null)
+})
+
+it('never looks up or links Jenkins for cucumber-* automation repos', () => {
+  assert.equal(skipsJenkins({ repo: 'gdncomm/cucumber-seo-backend' }), true)
+  assert.equal(skipsJenkins({ repo: 'gdncomm/seo-backend' }), false)
+  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/cucumber-seo-backend', number: 3 }), null)
 })

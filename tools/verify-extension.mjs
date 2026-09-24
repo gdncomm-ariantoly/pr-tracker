@@ -398,14 +398,21 @@ async function verify(context, id) {
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
   const fallback = page.locator('a.chip.b-unknown:not([href*="/search/?q="])')
   const ciPRs = await page.evaluate(async () => {
-    const { NO_CI_REPO } = await import('../lib/store.js')
+    const { NO_CI_REPO, skipsJenkins } = await import('../lib/store.js')
     const tab = document.querySelector('[role=tab][aria-selected=true]')?.getAttribute('data-tab') ?? 'mine'
     const { snapshot } = await chrome.storage.local.get('snapshot')
     const onlyPending = /** @type {HTMLInputElement} */ (document.getElementById('only-pending')).checked
     return /** @type {any[]} */ (/** @type {any} */ (snapshot)[tab])
       .filter((p) => !onlyPending || p.counts.pending > 0)
-      .filter((p) => !NO_CI_REPO.test(p.repo.split('/').pop())).length
+      .filter((p) => !NO_CI_REPO.test(p.repo.split('/').pop()) && !skipsJenkins(p)).length
   })
+  const cucumberIds = await page.evaluate(async () => {
+    const { snapshot } = await chrome.storage.local.get('snapshot')
+    return [.../** @type {any} */ (snapshot).mine, .../** @type {any} */ (snapshot).toReview].filter((p) => /^cucumber-/i.test(p.repo.split('/').pop())).map((p) => p.id)
+  })
+  let cucumberChips = 0
+  for (const id of cucumberIds) cucumberChips += await page.locator(`article.pr[data-id="${id}"] .chip.build`).count()
+  check('cucumber-* automation PRs get no Jenkins chip or link', cucumberChips === 0, `${cucumberChips} on ${cucumberIds.length} PRs`)
   check('hidden build status falls back to a Jenkins job link on every CI PR (not prod/non-prod deploy repos)', (await fallback.count()) === ciPRs, `${await fallback.count()} vs ${ciPRs}`)
   check('fallback link follows the job template', /\/job\/PR-\d+\/$/.test((await fallback.first().getAttribute('href')) ?? ''))
   check('no banner for a hidden build status when the link covers it', await page.isHidden('#warning'))

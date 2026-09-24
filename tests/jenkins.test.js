@@ -92,6 +92,15 @@ describe('addJenkinsBuilds', () => {
     assert.equal(snap.mine[2].build, null)
     assert.equal(snap.jenkinsBadToken, true)
   })
+
+  it('never asks Jenkins about cucumber-* automation repos', async () => {
+    /** @type {string[]} */ const asked = []
+    const f = /** @type {typeof fetch} */ (async (url) => (asked.push(String(url)), new Response(JSON.stringify({ number: 1, result: 'SUCCESS' }))))
+    const snap = /** @type {any} */ ({ mine: [pr('A', 'gdncomm/cucumber-seo-backend')], toReview: [] })
+    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: f, jenkinsAllowed: async () => true }, AUTH)
+    assert.deepEqual(asked, [])
+    assert.equal(snap.mine[0].build, null)
+  })
 })
 
 it('mapLimit keeps order and caps concurrency', async () => {
