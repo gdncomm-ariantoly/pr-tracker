@@ -41,7 +41,6 @@
         Jenkins job link
         <input type="url" id="jenkins" spellcheck="false" />
         <small class="muted">Used when GitHub doesn't show the build to your token. <code>{repo}</code> and <code>{number}</code> are filled in per PR. Leave empty to hide the link.</small>
-        <span class="row"><button type="button" id="jenkins-grant-settings">Allow reading build status from Jenkins</button><small class="muted">Uses your Jenkins sign-in in this browser, or the API token below. Read-only.</small></span>
       </label>
       <label>
         Jenkins API token <span class="muted">(optional)</span>
@@ -50,7 +49,7 @@
           <input type="password" id="jenkins-token" autocomplete="off" spellcheck="false" placeholder="Paste an API token (optional)" />
           <button type="button" id="jenkins-token-clear">Remove token</button>
         </span>
-        <small class="muted">With a token, build status works without being signed in to Jenkins in this browser. Create one in Jenkins → your name (top right) → Security / Configure → API Token → Add new token. Your user ID is shown on that page. The token has your full Jenkins rights; PR Tracker only reads with it. Stored only in this browser.</small>
+        <small class="muted">Needed for pass/fail on each PR, because GitHub doesn't show Jenkins builds to fine-grained tokens. Create one in Jenkins → your name (top right) → Security / Configure → API Token → Add new token. Your user ID is shown on that page. The token has your full Jenkins rights; PR Tracker only reads with it. Stored only in this browser.</small>
       </label>
       <label class="check">
         <input type="checkbox" id="notify" />
@@ -66,16 +65,16 @@
     <p class="banner error" id="error" role="alert" hidden></p>
     <p class="banner warning" id="warning" role="status" hidden></p>
     <p class="banner info" id="jenkins-access" hidden>
-      GitHub doesn't show Jenkins builds to your token. PR Tracker can read them from Jenkins directly, using your Jenkins sign-in in this browser.
-      <button type="button" class="primary" id="jenkins-grant">Show build status from Jenkins</button>
+      GitHub doesn't show Jenkins builds to your token. Add a Jenkins API token to see pass/fail on each PR.
+      <button type="button" class="primary" id="jenkins-setup">Add Jenkins token</button>
+    </p>
+    <p class="banner info" id="jenkins-grant-needed" hidden>
+      Chrome hasn't been allowed to reach Jenkins yet, so your Jenkins token isn't used.
+      <button type="button" class="primary" id="jenkins-grant">Allow access to Jenkins</button>
     </p>
     <p class="banner error" id="jenkins-bad-token" hidden>
       Jenkins rejected your API token (401). Check the user name and token in Settings, or
       <a id="jenkins-token-link" target="_blank" rel="noopener">create a new token ↗</a>.
-    </p>
-    <p class="banner info" id="jenkins-login" hidden>
-      Jenkins wants you signed in to show build status.
-      <a id="jenkins-login-link" target="_blank" rel="noopener">Sign in to Jenkins ↗</a>, then click Refresh.
     </p>
 
     <nav class="tabs" role="tablist">

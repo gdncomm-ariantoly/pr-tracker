@@ -23,16 +23,17 @@ describe('parseLastBuild', () => {
 })
 
 describe('fetchJenkinsBuild', () => {
-  it('asks lastBuild/api/json with the browser session', async () => {
+  const AUTH = { user: 'u', token: 't' }
+  it('asks lastBuild/api/json with the token, never the browser session', async () => {
     /** @type {[string, RequestInit | undefined][]} */ const calls = []
     const f = /** @type {typeof fetch} */ (async (url, init) => {
       calls.push([String(url), init])
       return new Response(JSON.stringify({ number: 3, result: 'SUCCESS' }), { status: 200 })
     })
-    const r = await fetchJenkinsBuild(JOB, f)
+    const r = await fetchJenkinsBuild(JOB, f, AUTH)
     assert.equal(r.kind, 'build')
     assert.match(calls[0][0], /PR-152\/lastBuild\/api\/json\?tree=/)
-    assert.equal(calls[0][1]?.credentials, 'include')
+    assert.equal(calls[0][1]?.credentials, 'omit')
   })
   it('sends an API token as Basic auth, without the session', async () => {
     /** @type {RequestInit | undefined} */ let init
@@ -48,10 +49,9 @@ describe('fetchJenkinsBuild', () => {
   it('encodes non-ASCII user names', () => {
     assert.equal(basicAuth({ user: 'ñ', token: 't' }), `Basic ${Buffer.from('ñ:t').toString('base64')}`)
   })
-  it('reads 403 (anonymous) as "sign in", 404 as "no job"', async () => {
-    assert.deepEqual(await fetchJenkinsBuild(JOB, reply(403)), { kind: 'login' })
-    assert.deepEqual(await fetchJenkinsBuild(JOB, reply(404)), { kind: 'none' })
-    assert.equal((await fetchJenkinsBuild(JOB, reply(500))).kind, 'error')
+  it('reads 404 as "no job" and other failures as errors', async () => {
+    assert.deepEqual(await fetchJenkinsBuild(JOB, reply(404), AUTH), { kind: 'none' })
+    assert.equal((await fetchJenkinsBuild(JOB, reply(500), AUTH)).kind, 'error')
   })
 })
 
@@ -59,18 +59,21 @@ describe('addJenkinsBuilds', () => {
   const pr = (/** @type {string} */ id, /** @type {string} */ repo, /** @type {any} */ build = null) => /** @type {any} */ ({ id, repo, number: 7, build })
   const TEMPLATE = 'https://jenkins-build-ci-2.gdn-app.com/job/T/job/{repo}/job/PR-{number}/'
 
-  it('does nothing until access is granted', async () => {
+  const AUTH = { user: 'u', token: 't' }
+  it('does nothing without a token, or until Chrome grants access', async () => {
     const snap = /** @type {any} */ ({ mine: [pr('A', 'o/svc')], toReview: [] })
-    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: reply(200, { number: 1, result: 'SUCCESS' }), jenkinsAllowed: async () => false })
+    const ok = reply(200, { number: 1, result: 'SUCCESS' })
+    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: ok, jenkinsAllowed: async () => true }, null)
+    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: ok, jenkinsAllowed: async () => false }, AUTH)
     assert.equal(snap.mine[0].build, null)
     assert.equal(snap.jenkinsChecked, undefined)
   })
 
-  it('fills builds GitHub lacked, once per PR, and flags sign-in', async () => {
+  it('fills builds GitHub lacked, once per PR, and flags a rejected token', async () => {
     /** @type {string[]} */ const asked = []
     const f = /** @type {typeof fetch} */ (async (url) => {
       asked.push(String(url))
-      if (String(url).includes('/job/locked/')) return new Response('', { status: 403 })
+      if (String(url).includes('/job/locked/')) return new Response('', { status: 401 })
       if (String(url).includes('/job/deploy/')) return new Response('', { status: 404 })
       return new Response(JSON.stringify({ number: 5, result: 'FAILURE' }), { status: 200 })
     })
@@ -80,14 +83,14 @@ describe('addJenkinsBuilds', () => {
       toReview: [{ ...both }],
     })
     let origin = ''
-    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: f, jenkinsAllowed: async (o) => ((origin = o), true) })
+    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: f, jenkinsAllowed: async (o) => ((origin = o), true) }, AUTH)
     assert.equal(origin, 'https://jenkins-build-ci-2.gdn-app.com')
     assert.equal(asked.length, 3, 'A once (though in both lists), B, C; D already had a build')
     assert.equal(snap.mine[0].build.state, 'failure')
     assert.equal(snap.toReview[0].build.state, 'failure')
-    assert.equal(snap.mine[1].jenkins, 'login')
+    assert.equal(snap.mine[1].build, null)
     assert.equal(snap.mine[2].build, null)
-    assert.equal(snap.jenkinsLogin, true)
+    assert.equal(snap.jenkinsBadToken, true)
   })
 })
 

@@ -39,6 +39,7 @@ const state = {
   jenkinsTemplate: '',
   jenkinsHidden: false,
   jenkinsGranted: false,
+  jenkinsHasToken: false,
 }
 
 /** @param {string} origin */
@@ -212,10 +213,7 @@ function renderPR(pr, viewer, showRepo) {
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
   if (pr.build) chips.append(buildChip(pr.build))
-  else if (pr.jenkins === 'login') {
-    const job = jenkinsJobUrl(state.jenkinsTemplate, pr)
-    if (job) chips.append(jobChip(job, 'Jenkins: sign in ↗', 'Sign in to Jenkins in this browser, then Refresh, to see the status'))
-  } else if (state.jenkinsHidden && !state.snapshot?.jenkinsChecked) {
+  else if (state.jenkinsHidden && !state.snapshot?.jenkinsChecked) {
     // Only guess the job link when GitHub is hiding builds from the token; a PR
     // whose builds are visible but absent (deployment repos) has no job to link.
     const job = jenkinsJobUrl(state.jenkinsTemplate, pr)
@@ -265,13 +263,10 @@ function paint() {
   warn.hidden = !warnings.length
   warn.textContent = warnings.join(' ')
 
-  // Jenkins: offer access while builds are hidden; ask for a sign-in when Jenkins wants one.
+  // Jenkins: while GitHub hides builds, suggest a token; with one, make sure Chrome may use it.
   const origin = jenkinsOrigin(state.jenkinsTemplate)
-  const access = $('jenkins-access')
-  access.hidden = !(origin && state.jenkinsHidden && !state.jenkinsGranted)
-  const login = $('jenkins-login')
-  login.hidden = !(origin && snap?.jenkinsLogin)
-  if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-login-link')).href = `${origin}/`
+  $('jenkins-access').hidden = !(origin && state.jenkinsHidden && !state.jenkinsHasToken)
+  $('jenkins-grant-needed').hidden = !(origin && state.jenkinsHasToken && !state.jenkinsGranted)
   $('jenkins-bad-token').hidden = !snap?.jenkinsBadToken
   if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-token-link')).href = `${origin}/me/configure`
 
@@ -380,6 +375,7 @@ $('settings').addEventListener('submit', async (event) => {
     jenkinsToken: typedJenkins || current.jenkinsToken,
   })
   if (asking) state.jenkinsGranted = await asking
+  state.jenkinsHasToken = !!(typedJenkins || current.jenkinsToken)
   input('token').value = ''
   input('jenkins-token').value = ''
   if (typedJenkins || current.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
@@ -403,12 +399,17 @@ async function grantJenkins() {
   if (state.jenkinsGranted) await doRefresh()
 }
 $('jenkins-grant').addEventListener('click', () => void grantJenkins())
+$('jenkins-setup').addEventListener('click', () => {
+  $('settings').hidden = false
+  $('toggle-settings').setAttribute('aria-expanded', 'true')
+  input('jenkins-user').focus()
+})
 $('jenkins-token-clear').addEventListener('click', async () => {
   await saveSettings({ ...(await loadSettings()), jenkinsToken: '' })
+  state.jenkinsHasToken = false
   input('jenkins-token').placeholder = 'Paste an API token (optional)'
   await doRefresh()
 })
-$('jenkins-grant-settings').addEventListener('click', () => void grantJenkins())
 
 for (const btn of document.querySelectorAll('[data-tab]')) {
   btn.addEventListener('click', () => {
@@ -466,6 +467,7 @@ async function init() {
   state.jenkinsTemplate = settings.jenkinsTemplate
   const origin = jenkinsOrigin(settings.jenkinsTemplate)
   state.jenkinsGranted = origin ? await jenkinsAllowed(origin) : false
+  state.jenkinsHasToken = !!(settings.jenkinsUser && settings.jenkinsToken)
   if (settings.token) input('token').placeholder = 'Token saved — paste a new one to replace it'
   showError(typeof lastError === 'string' ? lastError : null)
   paint()

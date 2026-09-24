@@ -309,7 +309,7 @@ async function verify(context, id) {
   check('hidden build status falls back to a Jenkins job link on every CI PR (not prod/non-prod deploy repos)', (await fallback.count()) === ciPRs, `${await fallback.count()} vs ${ciPRs}`)
   check('fallback link follows the job template', /\/job\/PR-\d+\/$/.test((await fallback.first().getAttribute('href')) ?? ''))
   check('no banner for a hidden build status when the link covers it', await page.isHidden('#warning'))
-  check('offers reading build status from Jenkins', await page.isVisible('#jenkins-access'))
+  check('suggests adding a Jenkins token', await page.isVisible('#jenkins-access'))
   mode = 'ok'
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
