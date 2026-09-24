@@ -31,6 +31,10 @@ Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployme
 
 Each tab is grouped by service (the repository name without `gdncomm/`). Order is "what needs me first": PRs with unfixed comments, then PRs with comments (all fixed or no action needed), then PRs without human comments, newest update first within each. Groups follow their most urgent PR. Comments you mark *No action needed* stop counting as unfixed for sorting too. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
 
+### Updates panel
+
+Every detected update (below) is also kept in an **Updates** panel on the right: newest first, unread marked with a dot and counted in the header, last 100 kept. Clicking one opens it on GitHub and marks it read; *Mark all read* clears the count. On windows narrower than 1100px the panel becomes a drawer behind the header's **Updates** button. The panel records updates even when desktop notifications are off.
+
 ### Notifications
 
 On each refresh the new snapshot is diffed against the previous one, and a desktop notification is raised for:

@@ -4,13 +4,16 @@
  * listener is registered synchronously at top level, all state is in storage.
  */
 
+import { addEvents } from './lib/inbox.js'
 import { diffSnapshots } from './lib/notify.js'
 import { badgeFor, refresh } from './lib/refresh.js'
-import { loadSettings, loadSnapshot } from './lib/store.js'
+import { loadInbox, loadSettings, loadSnapshot, saveInbox } from './lib/store.js'
 
 const ALARM = 'refresh'
 const APP = 'app' // notification-id prefix meaning "open the dashboard"
 const MAX_SEPARATE = 4 // beyond this, one summary notification instead of a flood
+/** Serialises inbox writes within this worker's lifetime (not state: nothing is lost if it restarts). */
+let inboxWrites = Promise.resolve()
 
 chrome.action.onClicked.addListener(() => {
   void openApp()
@@ -50,7 +53,14 @@ chrome.notifications.onClicked.addListener((id) => {
 /** @param {any} prev @param {any} next */
 async function notifyUpdates(prev, next) {
   const events = diffSnapshots(prev, next)
-  if (events.length === 0 || !(await loadSettings()).notify) return
+  if (events.length === 0) return
+  // The panel keeps every update; desktop notifications are the optional extra.
+  // Writes are chained so two quick refreshes can't overwrite each other's events.
+  inboxWrites = inboxWrites
+    .then(async () => saveInbox(addEvents(await loadInbox(), events)))
+    .catch((error) => console.error('PR Tracker: could not record updates', error)) // visible in the worker's console
+  await inboxWrites
+  if (!(await loadSettings()).notify) return
   const base = { type: /** @type {const} */ ('basic'), iconUrl: 'icons/icon-128.png' }
   if (events.length > MAX_SEPARATE) {
     await chrome.notifications.create(`${APP}|summary:${Date.now()}`, {

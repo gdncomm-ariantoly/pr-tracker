@@ -14,8 +14,11 @@
       <span class="muted" id="fetched"></span>
       <button type="button" class="primary" id="refresh">Refresh</button>
       <button type="button" id="toggle-settings" aria-expanded="false" aria-controls="settings">Settings</button>
+      <button type="button" id="toggle-inbox" aria-expanded="false" aria-controls="inbox">Updates <span class="n unread" id="unread" hidden>0</span></button>
     </header>
 
+    <div class="layout" id="layout">
+    <div class="content">
     <form class="settings" id="settings" hidden>
       <label>
         GitHub token
@@ -86,6 +89,19 @@
 
     <main id="list" aria-live="polite"></main>
     <p class="muted empty" id="empty" hidden></p>
+    </div>
+
+    <aside class="inbox" id="inbox" aria-label="Updates">
+      <div class="inbox-head">
+        <h2>Updates</h2>
+        <span class="spacer"></span>
+        <button type="button" id="inbox-read-all">Mark all read</button>
+        <button type="button" id="inbox-close" class="icon" aria-label="Close updates">×</button>
+      </div>
+      <ol class="inbox-list" id="inbox-list"></ol>
+      <p class="muted inbox-empty" id="inbox-empty">No updates yet. New comments, replies, approvals, build results and review requests show up here as they happen.</p>
+    </aside>
+    </div>
 
     <template id="pr-tpl">
       <article class="pr">

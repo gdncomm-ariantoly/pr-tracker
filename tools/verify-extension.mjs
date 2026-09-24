@@ -284,6 +284,23 @@ async function verify(context, id) {
   check('a new comment raises exactly one notification', ids.length === 1, JSON.stringify(ids))
   check('notification opens the comment on GitHub', ids[0]?.startsWith(`${target.url}#discussion_rNEW|`), ids[0])
 
+  // The Updates panel keeps the same event, unread, and clicking it marks it read.
+  await page.setViewportSize({ width: 1400, height: 900 })
+  const item = page.locator('#inbox-list li').first()
+  await item.waitFor()
+  check('Updates panel sits on the right and lists the new comment', (await page.isVisible('#inbox')) && ((await item.textContent()) ?? '').includes('New comment'))
+  check('it is unread, with a count in the header', (await item.getAttribute('class'))?.includes('unread') === true && (await page.textContent('#unread')) === '1')
+  const [tab] = await Promise.all([context.waitForEvent('page'), item.locator('a').click()])
+  check('clicking it opens the comment', tab.url().includes('discussion_rNEW'))
+  await tab.close()
+  check('and marks it read', !((await item.getAttribute('class')) ?? '').includes('unread') && (await page.isHidden('#unread')))
+  await page.setViewportSize({ width: 900, height: 900 })
+  check('narrow window: panel hidden behind an Updates button', (await page.isHidden('#inbox')) && (await page.isVisible('#toggle-inbox')))
+  await page.click('#toggle-inbox')
+  check('the button opens it as a drawer', await page.isVisible('#inbox'))
+  await page.click('#inbox-close')
+  await page.setViewportSize({ width: 1280, height: 720 })
+
   // Turning notifications off in Settings silences the next update.
   await worker.evaluate(() => chrome.notifications.getAll().then((all) => Promise.all(Object.keys(all).map((id) => chrome.notifications.clear(id)))))
   await page.click('#toggle-settings')

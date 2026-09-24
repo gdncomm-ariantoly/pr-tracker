@@ -1,9 +1,10 @@
 import { groupPRs, STALE_DAYS } from '../lib/group.js'
 import { renderComment } from './markdown.js'
+import { markRead, normaliseInbox, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
-import { jenkinsJobUrl, jenkinsOrigin, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
+import { jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -41,6 +42,7 @@ const state = {
   jenkinsHidden: false,
   jenkinsGranted: false,
   jenkinsHasToken: false,
+  /** @type {import('../lib/inbox.js').InboxItem[]} */ inbox: [],
 }
 
 /** @param {string} origin */
@@ -377,7 +379,57 @@ function showError(message) {
   el.textContent = message ?? ''
 }
 
+function paintInbox() {
+  const list = $('inbox-list')
+  list.replaceChildren()
+  for (const item of state.inbox) {
+    const li = document.createElement('li')
+    li.classList.toggle('unread', !item.read)
+    li.dataset.key = item.key
+    const a = document.createElement('a')
+    a.href = item.url
+    a.target = '_blank'
+    a.rel = 'noopener'
+    const parts = /** @type {const} */ ([['i-title', item.title], ['i-context', item.context], ['i-message', item.message], ['i-when', ago(item.at)]])
+    for (const [cls, text] of parts) {
+      if (!text) continue
+      const span = document.createElement('span')
+      span.className = cls
+      span.textContent = text
+      a.append(span)
+    }
+    a.addEventListener('click', () => {
+      state.inbox = markRead(state.inbox, item.key)
+      paintInbox()
+      void saveInbox(state.inbox)
+    })
+    li.append(a)
+    list.append(li)
+  }
+  $('inbox-empty').hidden = state.inbox.length > 0
+  const unread = unreadCount(state.inbox)
+  const badge = $('unread')
+  badge.hidden = unread === 0
+  badge.textContent = String(unread)
+  const readAll = /** @type {HTMLButtonElement} */ ($('inbox-read-all'))
+  readAll.disabled = unread === 0
+}
+
+/** @param {boolean} open */
+function showInbox(open) {
+  $('layout').classList.toggle('show-inbox', open)
+  $('toggle-inbox').setAttribute('aria-expanded', String(open))
+}
+
 // ---------------------------------------------------------------- actions
+
+$('toggle-inbox').addEventListener('click', () => showInbox(!$('layout').classList.contains('show-inbox')))
+$('inbox-close').addEventListener('click', () => showInbox(false))
+$('inbox-read-all').addEventListener('click', async () => {
+  state.inbox = markRead(state.inbox)
+  paintInbox()
+  await saveInbox(state.inbox)
+})
 
 async function doRefresh() {
   const btn = /** @type {HTMLButtonElement} */ ($('refresh'))
@@ -485,6 +537,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     state.jenkinsTemplate = /** @type {any} */ (changes.settings.newValue).jenkinsTemplate ?? ''
     paint()
   }
+  if (changes.inbox) {
+    state.inbox = normaliseInbox(changes.inbox.newValue)
+    paintInbox()
+  }
   if (changes.overrides) {
     const next = changes.overrides.newValue
     state.overrides = next && typeof next === 'object' ? /** @type {any} */ (next) : {}
@@ -497,14 +553,17 @@ chrome.storage.onChanged.addListener((changes, area) => {
 })
 
 async function init() {
-  const [settings, snapshot, overrides, { lastError }] = await Promise.all([
+  const [settings, snapshot, overrides, inbox, { lastError }] = await Promise.all([
     loadSettings(),
     loadSnapshot(),
     loadOverrides(),
+    loadInbox(),
     chrome.storage.local.get('lastError'),
   ])
   state.snapshot = snapshot
   state.overrides = overrides
+  state.inbox = inbox
+  paintInbox()
   const bots = /** @type {HTMLTextAreaElement} */ ($('bots'))
   bots.value = settings.extraBots.join(', ')
   const minutes = /** @type {HTMLSelectElement} */ ($('minutes'))
