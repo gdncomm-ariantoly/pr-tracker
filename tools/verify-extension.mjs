@@ -178,7 +178,14 @@ async function verify(context, id) {
     return { services: g.services.map((x) => x.name), stale: g.stale.length }
   })
   const shownGroups = await page.locator('section.group').evaluateAll((els) => els.map((e) => /** @type {HTMLElement} */ (e).dataset.group))
-  check('PRs are grouped by service, alphabetically', JSON.stringify(shownGroups) === JSON.stringify(expectedGroups.services), `${shownGroups} vs ${expectedGroups.services}`)
+  check('PRs are grouped by service, most urgent first', JSON.stringify(shownGroups) === JSON.stringify(expectedGroups.services), `${shownGroups} vs ${expectedGroups.services}`)
+  const shownOrder = await page.locator('section.group article.pr').evaluateAll((els) => els.map((e) => /** @type {HTMLElement} */ (e).dataset.id))
+  const expectedOrder = await page.evaluate(async () => {
+    const { groupPRs } = await import('../lib/group.js')
+    const { snapshot } = await chrome.storage.local.get('snapshot')
+    return groupPRs(/** @type {any[]} */ (/** @type {any} */ (snapshot).mine)).services.flatMap((g) => g.prs.map((/** @type {any} */ p) => p.id))
+  })
+  check('PRs with unfixed comments come first, then commented, newest first', JSON.stringify(shownOrder) === JSON.stringify(expectedOrder))
   const staleBox = page.locator('details.group.stale')
   if (expectedGroups.stale) {
     check('stale PRs sit in a Stale group', (await staleBox.locator('article.pr').count()) === expectedGroups.stale)

@@ -29,7 +29,7 @@ If GitHub hides builds from the token (fine-grained tokens may not see Jenkins c
 
 ### Layout
 
-Each tab is grouped by service (the repository name without `gdncomm/`), alphabetically, newest PR first. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
+Each tab is grouped by service (the repository name without `gdncomm/`). Order is "what needs me first": PRs with unfixed comments, then PRs with comments (all fixed or no action needed), then PRs without human comments, newest update first within each. Groups follow their most urgent PR. Comments you mark *No action needed* stop counting as unfixed for sorting too. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
 
 ### Notifications
 
