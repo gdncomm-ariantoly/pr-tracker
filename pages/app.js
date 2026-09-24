@@ -1,5 +1,6 @@
+import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
-import { loadSettings, loadSnapshot, parseList, saveSettings } from '../lib/store.js'
+import { loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -16,6 +17,8 @@ const STATUS_LABEL = {
   replied: 'Replied',
   'commit-after': 'Commit after',
   open: 'Not addressed',
+  'no-action': 'No action needed',
+  optional: 'Optional',
 }
 
 const DECISION_LABEL = /** @type {Record<string, string>} */ ({
@@ -29,6 +32,7 @@ const state = {
   onlyPending: false,
   /** @type {Snapshot | null} */ snapshot: null,
   /** @type {Set<string>} */ open: new Set(),
+  /** @type {import('../lib/overrides.js').Overrides} */ overrides: {},
 }
 
 try {
@@ -86,7 +90,9 @@ function renderFinding(f, viewer) {
   const tpl = /** @type {HTMLTemplateElement} */ ($('finding-tpl'))
   const li = /** @type {HTMLElement} */ (tpl.content.firstElementChild?.cloneNode(true))
   li.dataset.status = f.status
+  li.dataset.id = f.id
   li.classList.toggle('fixed', f.fixed)
+  li.classList.toggle('no-action', !!f.noAction)
   const status = /** @type {HTMLElement} */ (li.querySelector('.status'))
   status.textContent = STATUS_LABEL[f.status]
   status.className = `status s-${f.status}`
@@ -104,6 +110,24 @@ function renderFinding(f, viewer) {
   when.title = new Date(f.createdAt).toLocaleString()
   setText(li, '.body', excerpt(f.body) || '(no text)')
   setText(li, '.evidence', f.evidence)
+
+  // Manual override: only for comments still counted as unfixed, or to undo one.
+  const mark = /** @type {HTMLButtonElement} */ (li.querySelector('.mark'))
+  if (f.overridden) {
+    mark.textContent = 'Undo'
+    mark.title = 'Count this comment as unfixed again'
+  } else if (!f.fixed && !f.noAction) {
+    mark.textContent = 'No action needed'
+    mark.title = 'This comment does not need a code change'
+  } else {
+    mark.hidden = true
+  }
+  mark.addEventListener('click', async (event) => {
+    event.preventDefault()
+    state.overrides = toggleOverride(state.overrides, f.id, !f.overridden)
+    paint()
+    await saveOverrides(state.overrides)
+  })
   return li
 }
 
@@ -146,16 +170,18 @@ function renderPR(pr, viewer) {
     tally.append(chip(`${pr.counts.total} comment${pr.counts.total === 1 ? '' : 's'}`, 'c-human'))
     if (pr.counts.fixed) tally.append(chip(`${pr.counts.fixed} fixed`, 'c-fixed'))
     if (pr.counts.pending) tally.append(chip(`${pr.counts.pending} unfixed`, 'c-pending'))
+    if (pr.counts.noAction) tally.append(chip(`${pr.counts.noAction} no action`, 'c-muted'))
     const list = /** @type {HTMLElement} */ (el.querySelector('.findings'))
-    // Unfixed first — those are what need doing.
-    const ordered = [...pr.findings].sort((a, b) => Number(a.fixed) - Number(b.fixed))
+    // Unfixed first — those are what need doing — then no-action, then fixed.
+    const rank = (/** @type {Finding} */ f) => (f.fixed ? 2 : f.noAction ? 1 : 0)
+    const ordered = [...pr.findings].sort((a, b) => rank(a) - rank(b))
     for (const f of ordered) list.append(renderFinding(f, viewer))
   }
   return el
 }
 
 function paint() {
-  const snap = state.snapshot
+  const snap = state.snapshot && applyOverrides(state.snapshot, state.overrides)
   const list = $('list')
   const empty = $('empty')
   list.replaceChildren()
@@ -262,6 +288,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
     state.snapshot = /** @type {Snapshot} */ (changes.snapshot.newValue)
     paint()
   }
+  if (changes.overrides) {
+    const next = changes.overrides.newValue
+    state.overrides = next && typeof next === 'object' ? /** @type {any} */ (next) : {}
+    paint()
+  }
   if ('lastError' in changes) {
     const message = changes.lastError.newValue
     showError(typeof message === 'string' ? message : null)
@@ -269,12 +300,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
 })
 
 async function init() {
-  const [settings, snapshot, { lastError }] = await Promise.all([
+  const [settings, snapshot, overrides, { lastError }] = await Promise.all([
     loadSettings(),
     loadSnapshot(),
+    loadOverrides(),
     chrome.storage.local.get('lastError'),
   ])
   state.snapshot = snapshot
+  state.overrides = overrides
   const bots = /** @type {HTMLTextAreaElement} */ ($('bots'))
   bots.value = settings.extraBots.join(', ')
   const minutes = /** @type {HTMLSelectElement} */ ($('minutes'))

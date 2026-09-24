@@ -13,7 +13,7 @@ const finding = (over) => ({
 const pr = (over) => ({
   id: 'P1', repo: 'o/api', number: 1, title: 'Add cache', url: 'https://github.com/o/r/pull/1', author: 'me', isDraft: false,
   updatedAt: '2026-01-01T00:00:00Z', reviewDecision: 'REVIEW_REQUIRED', hasHumanComments: false, findings: [],
-  counts: { total: 0, fixed: 0, pending: 0 }, ...over,
+  counts: { total: 0, fixed: 0, noAction: 0, pending: 0 }, ...over,
 })
 /** @param {Partial<import('../lib/github.js').Snapshot>} over @returns {import('../lib/github.js').Snapshot} */
 const snap = (over) => ({

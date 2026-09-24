@@ -157,6 +157,27 @@ async function verify(context, id) {
   check('finding links to GitHub', ((await first.locator('a.when').getAttribute('href')) ?? '').startsWith('https://github.com/'))
   check('bot comments are not listed', (await page.locator('.finding .who', { hasText: 'productivity-tools-services' }).count()) === 0)
 
+  // Manual "No action needed" on an unfixed comment: recount, survive reload, undo.
+  const firstUnfixed = page.locator('article.pr').filter({ has: page.locator('.chip.c-pending') }).first()
+  if (await firstUnfixed.count()) {
+    // Pin by id: once its only unfixed comment is marked, a "has unfixed" locator would jump to another card.
+    const unfixedCard = page.locator(`article.pr[data-id="${await firstUnfixed.getAttribute('data-id')}"]`)
+    if (!(await unfixedCard.locator('details').evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open))) await unfixedCard.locator('summary').click()
+    const pendingBefore = await unfixedCard.locator('.finding[data-status=open], .finding[data-status=replied], .finding[data-status=commit-after]').count()
+    const target = unfixedCard.locator('.finding').filter({ has: page.locator('button.mark', { hasText: 'No action needed' }) }).first()
+    const id = await target.getAttribute('data-id')
+    await target.locator('button.mark').click()
+    const marked = page.locator(`.finding[data-id="${id}"]`)
+    check('marking a comment switches it to No action needed', (await marked.locator('.status').textContent()) === 'No action needed')
+    check('the PR stops counting it as unfixed', (await unfixedCard.locator('.finding[data-status=open], .finding[data-status=replied], .finding[data-status=commit-after]').count()) === pendingBefore - 1)
+    const stored = await page.evaluate(() => chrome.storage.local.get('overrides'))
+    check('the mark is saved', Object.keys(stored.overrides ?? {}).length === 1)
+    await marked.locator('button.mark', { hasText: 'Undo' }).click()
+    check('undo restores it', (await unfixedCard.locator('.finding[data-status=open], .finding[data-status=replied], .finding[data-status=commit-after]').count()) === pendingBefore)
+  } else {
+    check('fixture has an unfixed comment to mark', false)
+  }
+
   // The [hidden] trap: filter must actually hide cards.
   await page.check('#only-pending')
   const pendingCards = await page.locator('article.pr').count()

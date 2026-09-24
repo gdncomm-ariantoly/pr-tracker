@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { analyzePR, claimsFix, isBot } from '../lib/analyze.js'
+import { analyzePR, claimsFix, classifyIntent, isBot } from '../lib/analyze.js'
 
 const me = { login: 'alice', __typename: 'User' }
 const bob = { login: 'bob', __typename: 'User' }
@@ -54,11 +54,36 @@ describe('claimsFix', () => {
   })
 })
 
+describe('classifyIntent', () => {
+  // Phrases taken from real reviews on gdncomm PRs.
+  const cases = /** @type {[string, string | null][]} */ ([
+    ['**Verdict:** 🟢 `Approve`. PR size is 355 lines.', 'no-action'],
+    ['Test coverage looks thorough. No blocking issues.', 'no-action'],
+    ['No correctness issues found. Not auto-approving per review policy — flagging as solid for a human reviewer to approve.', 'no-action'],
+    ['## Verdict 🟡 `Approve with suggestions` — the concerns are about what happens later.', 'optional'],
+    ['**Nit (non-blocking):** `allowedSpecificationKeys` could be a Set.', 'optional'],
+    ['Not approving per review policy — please have a human reviewer approve once the case-sensitivity concern is addressed.', null],
+    ['Nothing else stood out. Two things worth a look before merge: 1. the null guard', null],
+    ['No other issues found in this delta.', null],
+    ['ini bisa kena exception kalo entry key nya ga parseable', null],
+    ['This is a blocking bug: the cache never expires.', null],
+  ])
+  for (const [body, expected] of cases) {
+    it(`${expected ?? 'actionable'} ← ${body.slice(0, 50)}`, () => {
+      assert.equal(classifyIntent(body)?.status ?? null, expected)
+    })
+  }
+  it('trusts GitHub review states', () => {
+    assert.equal(classifyIntent('', 'APPROVED')?.status, 'no-action')
+    assert.equal(classifyIntent('No blocking issues.', 'CHANGES_REQUESTED'), null)
+  })
+})
+
 describe('analyzePR', () => {
   it('ignores bot comments and the author’s own comments', () => {
     const s = analyzePR(pr({ comments: { nodes: [c(bot, 'Code quality', '2026-01-01T01:00:00Z'), c(me, 'note', '2026-01-01T02:00:00Z')] } }))
     assert.equal(s.hasHumanComments, false)
-    assert.deepEqual(s.counts, { total: 0, fixed: 0, pending: 0 })
+    assert.deepEqual(s.counts, { total: 0, fixed: 0, noAction: 0, pending: 0 })
   })
 
   it('classifies inline threads by resolve / reply / outdated / commit', () => {
@@ -74,7 +99,7 @@ describe('analyzePR', () => {
       ] },
     }))
     assert.deepEqual(s.findings.map((f) => f.status), ['resolved', 'fixed-reply', 'outdated', 'replied', 'commit-after', 'open'])
-    assert.deepEqual(s.counts, { total: 6, fixed: 3, pending: 3 })
+    assert.deepEqual(s.counts, { total: 6, fixed: 3, noAction: 0, pending: 3 })
   })
 
   it('judges a thread from the reviewer’s last word, not the first', () => {
@@ -122,5 +147,20 @@ describe('analyzePR', () => {
     }))
     // The deleted ("ghost", author null) account cannot be judged human, so only bob's thread counts.
     assert.deepEqual(s.findings.map((f) => [f.author, f.status]), [['bob', 'commit-after']])
+  })
+
+  it('counts no-action comments apart from fixed and unfixed', () => {
+    const s = analyzePR(pr({
+      reviews: { nodes: [
+        { ...c(bob, 'No blocking issues.', '2026-01-01T01:00:00Z'), state: 'COMMENTED' },
+        { ...c(bob, 'please add a test', '2026-01-01T01:00:00Z'), state: 'COMMENTED' },
+      ] },
+      reviewThreads: { nodes: [
+        thread([c(bob, 'nit (non-blocking): rename', '2026-01-01T01:00:00Z')]),
+        thread([c(bob, 'nit: rename', '2026-01-01T01:00:00Z'), c(bob, 'actually this breaks the build', '2026-01-01T02:00:00Z')]),
+      ] },
+    }))
+    assert.deepEqual(s.findings.map((f) => f.status).sort(), ['no-action', 'open', 'open', 'optional'])
+    assert.deepEqual(s.counts, { total: 4, fixed: 0, noAction: 2, pending: 2 })
   })
 })

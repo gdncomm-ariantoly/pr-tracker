@@ -81,6 +81,7 @@
   .pill { font: 600 .72rem/1 var(--body); padding: 5px 9px; border-radius: 99px; }
   .ok { background: var(--accent-soft); color: var(--accent); }
   .mid { background: var(--warn-bg); color: var(--warn-ink); }
+  .na { background: var(--code-bg); color: var(--muted); }
 
   section { display: grid; gap: 16px; }
 
@@ -175,6 +176,7 @@
         <div class="status-row">
           <span class="pill ok">Resolved</span><span class="pill ok">Code changed</span><span class="pill ok">Fixed (reply)</span>
           <span class="pill mid">Replied</span><span class="pill mid">Commit after</span>
+          <span class="pill na">No action needed</span><span class="pill na">Optional</span>
         </div>
       </div>
     </div>
@@ -292,6 +294,10 @@
       <details>
         <summary>A comment says "Commit after" but I did fix it</summary>
         <div><p>Statuses are a best guess. For the tracker to count it as fixed, resolve the thread on GitHub or reply with something like "Done in abc1234". Replies in Indonesian (sudah, diperbaiki) count too.</p></div>
+      </details>
+      <details>
+        <summary>A comment counts as unfixed but doesn't need a change</summary>
+        <div><p>Approvals and clean AI reviews ("No blocking issues", "flagging as solid for a human reviewer") are recognised automatically as <strong>No action needed</strong>. For anything it misses, click <strong>No action needed</strong> on the comment. Click <strong>Undo</strong> to reverse it.</p></div>
       </details>
       <details>
         <summary>A bot account shows up as a person</summary>

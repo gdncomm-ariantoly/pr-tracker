@@ -113,6 +113,10 @@ main { max-width: 960px; margin: 0 auto 48px; padding: 0 16px; display: grid; ga
 .findings { list-style: none; margin: 0; padding: 0 16px 12px 40px; display: grid; gap: 8px; }
 .finding { border-left: 3px solid var(--bad-fg); padding: 6px 12px; background: var(--bg); border-radius: 0 6px 6px 0; }
 .finding.fixed { border-left-color: var(--ok-fg); }
+.finding.no-action { border-left-color: var(--line); }
+.finding.no-action .body { color: var(--muted); }
+.mark { font-size: 11px; padding: 1px 8px; border-radius: 999px; color: var(--muted); }
+.mark:hover { color: var(--fg); border-color: var(--muted); }
 .finding[data-status=replied], .finding[data-status=commit-after] { border-left-color: var(--warn-fg); }
 .f-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
 .where { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; word-break: break-all; }
@@ -123,6 +127,7 @@ main { max-width: 960px; margin: 0 auto 48px; padding: 0 16px; display: grid; ga
 .s-resolved, .s-outdated, .s-fixed-reply { background: var(--ok-bg); color: var(--ok-fg); }
 .s-replied, .s-commit-after { background: var(--warn-bg); color: var(--warn-fg); }
 .s-open { background: var(--bad-bg); color: var(--bad-fg); }
+.s-no-action, .s-optional { background: var(--gray-bg); color: var(--gray-fg); }
 
 @media (max-width: 600px) {
   .bar { padding: 10px 16px; }
