@@ -303,7 +303,8 @@
       </details>
       <details>
         <summary>No Jenkins build shows on a PR</summary>
-        <div><p>Either the PR's latest commit hasn't reported a build to GitHub yet, or GitHub is hiding builds from your token. Make sure the token has <strong>Commit statuses: Read-only</strong> (edit it, no new token needed) and click Refresh. If builds are still hidden, GitHub doesn't show Jenkins check runs to fine-grained tokens. Click <strong>Show build status from Jenkins</strong> in the blue banner (or in Settings) and accept Chrome's prompt. PR Tracker then reads pass/fail from Jenkins using your Jenkins sign-in in this browser. If a chip says <em>Jenkins: sign in</em>, open Jenkins, sign in, and click Refresh.</p></div>
+        <div><p>Either the PR's latest commit hasn't reported a build to GitHub yet, or GitHub is hiding builds from your token. Make sure the token has <strong>Commit statuses: Read-only</strong> (edit it, no new token needed) and click Refresh. If builds are still hidden, GitHub doesn't show Jenkins check runs to fine-grained tokens. Click <strong>Show build status from Jenkins</strong> in the blue banner (or in Settings) and accept Chrome's prompt. PR Tracker then reads pass/fail from Jenkins using your Jenkins sign-in in this browser. If a chip says <em>Jenkins: sign in</em>, open Jenkins, sign in, and click Refresh.</p>
+          <p>To skip the sign-in, add a <strong>Jenkins API token</strong> in Settings: in Jenkins click your name (top right) → Security or Configure → API Token → <em>Add new token</em>, then paste it with your Jenkins user ID. Status then works even when your Jenkins session expires.</p></div>
       </details>
       <details>
         <summary>A bot account shows up as a person</summary>

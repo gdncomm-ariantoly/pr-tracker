@@ -25,6 +25,8 @@ If GitHub hides builds from the token (fine-grained tokens may not see Jenkins c
 
 **Status straight from Jenkins.** When builds are hidden, a blue banner offers *Show build status from Jenkins*. Accepting grants the optional host permission for the Jenkins host (`*.gdn-app.com`). From then on each refresh asks `…/PR-{number}/lastBuild/api/json` using your **own Jenkins sign-in in this browser**: no Jenkins token is stored. Not signed in (Jenkins answers 403): the chip says *Jenkins: sign in ↗* and a banner links to Jenkins. No job (404, e.g. deployment repos): no chip. At most 6 requests run at once.
 
+**Or a Jenkins API token.** Settings → *Jenkins API token* takes your Jenkins user ID and an API token (Jenkins → your name → Security/Configure → API Token → Add new token). When set, lookups send it as HTTP Basic auth and leave the browser session out, so status works even when your Jenkins SSO session has expired, including background refreshes. A rejected token (401) shows a red banner; *Remove token* falls back to the session. Jenkins tokens are not scoped: it carries your full Jenkins rights, though PR Tracker only reads with it. It's stored in `chrome.storage.local` like the GitHub token.
+
 ### Layout
 
 Each tab is grouped by service (the repository name without `gdncomm/`), alphabetically, newest PR first. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.

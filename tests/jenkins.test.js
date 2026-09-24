@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { fetchJenkinsBuild, mapLimit, parseLastBuild } from '../lib/jenkins.js'
+import { basicAuth, fetchJenkinsBuild, mapLimit, parseLastBuild } from '../lib/jenkins.js'
 import { addJenkinsBuilds } from '../lib/refresh.js'
 
 const JOB = 'https://jenkins-build-ci-2.gdn-app.com/job/GitHub/job/gdncomm/job/GDN/job/TRFCEE/job/product-feed/job/PR-152/'
@@ -33,6 +33,20 @@ describe('fetchJenkinsBuild', () => {
     assert.equal(r.kind, 'build')
     assert.match(calls[0][0], /PR-152\/lastBuild\/api\/json\?tree=/)
     assert.equal(calls[0][1]?.credentials, 'include')
+  })
+  it('sends an API token as Basic auth, without the session', async () => {
+    /** @type {RequestInit | undefined} */ let init
+    const f = /** @type {typeof fetch} */ (async (_url, i) => ((init = i), new Response(JSON.stringify({ number: 1, result: 'SUCCESS' }), { status: 200 })))
+    await fetchJenkinsBuild(JOB, f, { user: 'ari.antoly', token: '11abc' })
+    assert.equal(/** @type {Record<string, string>} */ (init?.headers).Authorization, `Basic ${Buffer.from('ari.antoly:11abc').toString('base64')}`)
+    assert.equal(init?.credentials, 'omit')
+  })
+  it('reads 401 with a token as a bad token, not a sign-in', async () => {
+    assert.deepEqual(await fetchJenkinsBuild(JOB, reply(401), { user: 'u', token: 't' }), { kind: 'bad-token' })
+    assert.equal((await fetchJenkinsBuild(JOB, reply(403), { user: 'u', token: 't' })).kind, 'error')
+  })
+  it('encodes non-ASCII user names', () => {
+    assert.equal(basicAuth({ user: 'ñ', token: 't' }), `Basic ${Buffer.from('ñ:t').toString('base64')}`)
   })
   it('reads 403 (anonymous) as "sign in", 404 as "no job"', async () => {
     assert.deepEqual(await fetchJenkinsBuild(JOB, reply(403)), { kind: 'login' })

@@ -272,6 +272,8 @@ function paint() {
   const login = $('jenkins-login')
   login.hidden = !(origin && snap?.jenkinsLogin)
   if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-login-link')).href = `${origin}/`
+  $('jenkins-bad-token').hidden = !snap?.jenkinsBadToken
+  if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-token-link')).href = `${origin}/me/configure`
 
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
   $('fetched').textContent = snap ? `updated ${ago(snap.fetchedAt)}` : ''
@@ -359,6 +361,13 @@ $('toggle-settings').addEventListener('click', () => {
 
 $('settings').addEventListener('submit', async (event) => {
   event.preventDefault()
+  // A new Jenkins token needs the Jenkins host permission. Ask first: Chrome
+  // only allows the prompt synchronously inside the click, before any await.
+  const typedJenkins = input('jenkins-token').value.trim()
+  const template = input('jenkins').value.trim()
+  const origin = jenkinsOrigin(template)
+  const asking = typedJenkins && origin && !state.jenkinsGranted ? chrome.permissions.request({ origins: [`${origin}/*`] }).catch(() => false) : null
+
   const current = await loadSettings()
   const typed = input('token').value.trim()
   await saveSettings({
@@ -366,9 +375,14 @@ $('settings').addEventListener('submit', async (event) => {
     extraBots: parseList(/** @type {HTMLTextAreaElement} */ ($('bots')).value),
     refreshMinutes: Number(/** @type {HTMLSelectElement} */ ($('minutes')).value),
     notify: input('notify').checked,
-    jenkinsTemplate: input('jenkins').value.trim(),
+    jenkinsTemplate: template,
+    jenkinsUser: input('jenkins-user').value.trim(),
+    jenkinsToken: typedJenkins || current.jenkinsToken,
   })
+  if (asking) state.jenkinsGranted = await asking
   input('token').value = ''
+  input('jenkins-token').value = ''
+  if (typedJenkins || current.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
   input('token').placeholder = typed || current.token ? 'Token saved — paste a new one to replace it' : 'github_pat_…'
   $('settings').hidden = true
   $('toggle-settings').setAttribute('aria-expanded', 'false')
@@ -389,6 +403,11 @@ async function grantJenkins() {
   if (state.jenkinsGranted) await doRefresh()
 }
 $('jenkins-grant').addEventListener('click', () => void grantJenkins())
+$('jenkins-token-clear').addEventListener('click', async () => {
+  await saveSettings({ ...(await loadSettings()), jenkinsToken: '' })
+  input('jenkins-token').placeholder = 'Paste an API token (optional)'
+  await doRefresh()
+})
 $('jenkins-grant-settings').addEventListener('click', () => void grantJenkins())
 
 for (const btn of document.querySelectorAll('[data-tab]')) {
@@ -442,6 +461,8 @@ async function init() {
   minutes.value = String(settings.refreshMinutes)
   input('notify').checked = settings.notify
   input('jenkins').value = settings.jenkinsTemplate
+  input('jenkins-user').value = settings.jenkinsUser
+  if (settings.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
   state.jenkinsTemplate = settings.jenkinsTemplate
   const origin = jenkinsOrigin(settings.jenkinsTemplate)
   state.jenkinsGranted = origin ? await jenkinsAllowed(origin) : false

@@ -53,8 +53,14 @@ try {
   await context.addCookies([{ name: 'JSESSIONID.test', value: 'signed-in', domain: 'jenkins-build-ci-2.gdn-app.com', path: '/', secure: true, httpOnly: true, sameSite: 'Lax' }])
   await context.route('https://api.github.com/graphql', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(github) }))
   // Only build lookups are replayed; anything else (whoAmI below) goes to the real Jenkins.
+  /** @type {string[]} */ const authHeaders = []
   await context.route(`${JENKINS}/**/lastBuild/api/json*`, async (route) => {
     const url = route.request().url()
+    const auth = (await route.request().allHeaders()).authorization ?? ''
+    authHeaders.push(auth)
+    // A token is judged on its own: the good one sees every build, a bad one gets 401.
+    if (auth === `Basic ${Buffer.from('ci.user:bad').toString('base64')}`) return route.fulfill({ status: 401, body: 'Invalid password/token' })
+    if (auth && url.includes('/PR-104/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ number: 9, result: 'SUCCESS', building: false }) })
     const json = (/** @type {object} */ b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
     if (url.includes('/PR-101/')) return json({ number: 12, result: 'SUCCESS', building: false, url: `${JENKINS}/job/x/job/PR-101/12/`, timestamp: Date.now() - 60_000, duration: 30_000 })
     if (url.includes('/PR-103/')) return json({ number: 4, result: null, building: true, url: `${JENKINS}/job/x/job/PR-103/4/` })
@@ -97,6 +103,30 @@ try {
   check('no "allow access" banner once granted', await page.isHidden('#jenkins-access'))
   await page.click('#tab-mine')
   check('no job (404) means no chip, not a dead link', (await page.locator('article.pr', { hasText: '#102 ' }).locator('.chip.build').count()) === 0)
+
+  // API token: saved in Settings, sent as Basic auth, lifts the sign-in requirement.
+  await page.click('#toggle-settings')
+  await page.fill('#jenkins-user', 'ci.user')
+  await page.fill('#jenkins-token', 'good')
+  authHeaders.length = 0
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  check('Jenkins token sent as Basic auth', authHeaders.length > 0 && authHeaders.every((h) => h === `Basic ${Buffer.from('ci.user:good').toString('base64')}`), authHeaders[0])
+  check('token field cleared, token kept', (await page.inputValue('#jenkins-token')) === '' && (await page.getAttribute('#jenkins-token', 'placeholder'))?.includes('saved') === true)
+  await page.click('#tab-toReview')
+  await page.evaluate(() => document.querySelectorAll('details.stale').forEach((d) => /** @type {HTMLDetailsElement} */ (d).setAttribute('open', '')))
+  check('with a token, the PR that needed sign-in shows its build', ((await chipOf(104).textContent()) ?? '') === 'Jenkins #9 passed', (await chipOf(104).textContent()) ?? '')
+  check('sign-in banner gone with a token', await page.isHidden('#jenkins-login'))
+
+  await page.click('#toggle-settings')
+  await page.fill('#jenkins-token', 'bad')
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  check('a rejected token says so', await page.isVisible('#jenkins-bad-token'))
+  await page.click('#toggle-settings')
+  await page.click('#jenkins-token-clear')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  check('removing the token falls back to the browser session', await page.isHidden('#jenkins-bad-token') && (await page.evaluate(async () => /** @type {any} */ ((await chrome.storage.local.get('settings')).settings).jenkinsToken)) === '')
   check('no page errors', errors.length === 0, errors[0])
 } finally {
   await context.close()

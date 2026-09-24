@@ -6,7 +6,7 @@ import { DEFAULTS, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList } from 
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
   assert.deepEqual(normalise({ token: ' x ', extraBots: ['Jenkins', 3, ''], refreshMinutes: -5 }), {
-    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsTemplate: JENKINS_TEMPLATE,
+    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsTemplate: JENKINS_TEMPLATE, jenkinsUser: '', jenkinsToken: '',
   })
 })
 
