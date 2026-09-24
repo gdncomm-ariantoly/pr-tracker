@@ -20,6 +20,10 @@ it('builds the Jenkins job link from the template', () => {
     'https://jenkins-build-ci-2.gdn-app.com/job/GitHub/job/gdncomm/job/GDN/job/TRFCEE/job/product-feed/job/PR-152/',
   )
   assert.equal(jenkinsJobUrl('', { repo: 'o/r', number: 1 }), null)
+  // prod / non-prod Jenkins never report PR builds and aren't on the CI host
+  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/prod-deployment-gdn-product-feed', number: 33 }), null)
+  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/nonprod-rundeck-gdn-preprod', number: 46 }), null)
+  assert.notEqual(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/product-feed', number: 1 }), null)
   assert.equal(normalise({ jenkinsTemplate: 'javascript:alert(1)' }).jenkinsTemplate, JENKINS_TEMPLATE, 'https only')
   assert.equal(normalise({ jenkinsTemplate: '' }).jenkinsTemplate, '', 'empty turns it off')
 })
