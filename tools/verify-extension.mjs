@@ -221,7 +221,8 @@ async function verify(context, id) {
   const fixedItem = page.locator('.finding.fixed').first()
   if (await fixedItem.count()) {
     check('fixed comments start folded', (await fixedItem.getAttribute('class'))?.includes('folded') === true && (await fixedItem.locator('.body').isHidden()) && (await fixedItem.locator('.preview').isVisible()))
-    check('unfixed comments stay open', (await page.locator('.finding:not(.fixed).folded').count()) === 0)
+    check('unfixed comments stay open', (await page.locator('.finding:not(.fixed):not(.no-action).folded').count()) === 0)
+    check('no-action comments start folded too', (await page.locator('.finding.no-action:not(.folded)').count()) === 0)
     const fixedId = await fixedItem.getAttribute('data-id')
     await fixedItem.locator('.f-head .who').click()
     check('clicking a folded comment opens it', await page.locator(`.finding[data-id="${fixedId}"] .body`).isVisible())
@@ -255,6 +256,7 @@ async function verify(context, id) {
     await target.locator('button.mark').click()
     const marked = page.locator(`.finding[data-id="${id}"]`)
     check('marking a comment switches it to No action needed', (await marked.locator('.status').textContent()) === 'No action needed')
+    check('and folds it', (await marked.getAttribute('class'))?.includes('folded') === true)
     check('the PR stops counting it as unfixed', (await unfixedCard.locator('.finding[data-status=open], .finding[data-status=replied], .finding[data-status=commit-after]').count()) === pendingBefore - 1)
     const stored = await page.evaluate(() => chrome.storage.local.get('overrides'))
     check('the mark is saved', Object.keys(stored.overrides ?? {}).length === 1)

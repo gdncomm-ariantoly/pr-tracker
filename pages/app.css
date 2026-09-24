@@ -140,7 +140,7 @@ a.chip.build:hover { text-decoration: underline; }
 .finding { border-left: 3px solid var(--bad-fg); padding: 6px 12px; background: var(--bg); border-radius: 0 6px 6px 0; }
 .finding.fixed { border-left-color: var(--ok-fg); }
 .finding.no-action { border-left-color: var(--line); }
-.finding.fixed .f-head { cursor: pointer; }
+.finding.fixed .f-head, .finding.no-action .f-head { cursor: pointer; }
 .fold { border: 0; background: none; padding: 0 2px; color: var(--muted); font-size: 11px; width: 14px; }
 .finding.folded { padding-block: 4px; }
 .finding.folded .body, .finding.folded .more, .finding.folded .conversation, .finding.folded .evidence { display: none; }

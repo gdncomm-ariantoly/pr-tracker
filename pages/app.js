@@ -43,7 +43,7 @@ const state = {
   jenkinsGranted: false,
   jenkinsHasToken: false,
   /** @type {import('../lib/inbox.js').InboxItem[]} */ inbox: [],
-  /** Fixed comments the user opened; fixed ones start folded. */
+  /** Folded comments (fixed / no action needed) the user opened. */
   /** @type {Set<string>} */ unfolded: new Set(),
 }
 
@@ -222,7 +222,7 @@ function renderFinding(f, viewer) {
   convo.hidden = !f.conversation?.length
   setText(li, '.evidence', f.evidence)
 
-  // Fixed comments fold to one line; the header toggles them.
+  // Fixed and no-action comments fold to one line; the header toggles them.
   const fold = /** @type {HTMLButtonElement} */ (li.querySelector('.fold'))
   let measured = false
   const setFolded = (/** @type {boolean} */ folded) => {
@@ -236,7 +236,7 @@ function renderFinding(f, viewer) {
       collapsible(body, more)
     }
   }
-  if (f.fixed) {
+  if (f.fixed || f.noAction) {
     fold.hidden = false
     setText(li, '.preview', excerpt(f.body).replace(/\s+/g, ' ').slice(0, 140) || '(no text)')
     setFolded(!state.unfolded.has(f.id))
