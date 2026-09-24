@@ -17,6 +17,10 @@ Anything that asks for a change ("before merge", "once … is addressed", "pleas
 
 Bots are excluded: GitHub App accounts, `*[bot]`, plus any logins you list in Settings. The badge shows how many PRs have your review requested; it refreshes on a timer (default 15 min).
 
+### Layout
+
+Each tab is grouped by service (the repository name without `gdncomm/`), alphabetically, newest PR first. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
+
 ### Notifications
 
 On each refresh the new snapshot is diffed against the previous one, and a desktop notification is raised for:

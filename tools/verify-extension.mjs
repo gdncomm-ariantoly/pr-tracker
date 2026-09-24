@@ -130,7 +130,8 @@ async function verify(context, id) {
 
   await page.fill('#token', 'test-token')
   await page.click('#settings button[type=submit]')
-  await page.waitForSelector('article.pr')
+  // attached, not visible: every PR may be inside the collapsed Stale group
+  await page.waitForSelector('article.pr', { state: 'attached' })
   check('token is sent as Bearer', authHeaders[0] === 'Bearer test-token', authHeaders[0])
   check('settings form closes after save', !(await page.isVisible('#settings')))
   check('token field is cleared after save', (await page.inputValue('#token')) === '')
@@ -144,6 +145,25 @@ async function verify(context, id) {
 
   await page.click('#tab-mine')
   check('My PRs tab renders its PRs', (await page.locator('article.pr').count()) === nMine)
+
+  // Grouping: one section per service, stale PRs in a collapsed group at the end.
+  const expectedGroups = await page.evaluate(async () => {
+    const { groupPRs } = await import('../lib/group.js')
+    const { snapshot } = await chrome.storage.local.get('snapshot')
+    const g = groupPRs(/** @type {any} */ (snapshot).mine)
+    return { services: g.services.map((x) => x.name), stale: g.stale.length }
+  })
+  const shownGroups = await page.locator('section.group').evaluateAll((els) => els.map((e) => /** @type {HTMLElement} */ (e).dataset.group))
+  check('PRs are grouped by service, alphabetically', JSON.stringify(shownGroups) === JSON.stringify(expectedGroups.services), `${shownGroups} vs ${expectedGroups.services}`)
+  const staleBox = page.locator('details.group.stale')
+  if (expectedGroups.stale) {
+    check('stale PRs sit in a Stale group', (await staleBox.locator('article.pr').count()) === expectedGroups.stale)
+    check('Stale group starts collapsed', !(await staleBox.evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open)))
+    check('Stale group is last', await page.locator('main > :last-child').evaluate((e) => e.classList.contains('stale')))
+    await staleBox.locator(':scope > summary').click() // open it so the checks below can reach every card
+  } else {
+    check('no Stale group when nothing is stale', (await staleBox.count()) === 0)
+  }
   const noHuman = await page.locator('article.pr .tally .chip', { hasText: 'No human comments' }).count()
   check('PRs without human comments are labelled', noHuman > 0)
 

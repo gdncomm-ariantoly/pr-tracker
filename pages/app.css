@@ -85,7 +85,22 @@ button:disabled { opacity: .6; cursor: default; }
 .tabs .n { font-size: 12px; opacity: .8; margin-left: 4px; }
 .filter { display: flex; gap: 6px; align-items: center; color: var(--muted); }
 
-main { max-width: 960px; margin: 0 auto 48px; padding: 0 16px; display: grid; gap: 8px; }
+main { max-width: 960px; margin: 0 auto 48px; padding: 0 16px; display: grid; gap: 20px; }
+.group { display: grid; gap: 8px; }
+.group-head {
+  font-size: 13px; font-weight: 600; margin: 0; color: var(--muted);
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.group-head .n { font-size: 11px; padding: 0 7px; border-radius: 999px; background: var(--gray-bg); color: var(--gray-fg); font-family: inherit; }
+.group-note { font-weight: 400; font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+details.stale { border-top: 1px dashed var(--line); padding-top: 12px; }
+details.stale > summary { cursor: pointer; list-style: none; }
+details.stale > summary::-webkit-details-marker { display: none; }
+details.stale > summary::before { content: "▸"; }
+details.stale[open] > summary::before { content: "▾"; }
+details.stale[open] > summary { margin-bottom: 8px; }
+details.stale .pr { opacity: .8; }
 .empty { text-align: center; padding: 24px; }
 
 .pr { background: var(--card); border: 1px solid var(--line); border-radius: 8px; }

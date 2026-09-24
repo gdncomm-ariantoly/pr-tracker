@@ -1,3 +1,4 @@
+import { groupPRs, STALE_DAYS } from '../lib/group.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
@@ -30,6 +31,7 @@ const DECISION_LABEL = /** @type {Record<string, string>} */ ({
 const state = {
   /** @type {'toReview' | 'mine'} */ tab: 'toReview',
   onlyPending: false,
+  staleOpen: false,
   /** @type {Snapshot | null} */ snapshot: null,
   /** @type {Set<string>} */ open: new Set(),
   /** @type {import('../lib/overrides.js').Overrides} */ overrides: {},
@@ -39,13 +41,14 @@ try {
   const saved = JSON.parse(localStorage.getItem('ui') ?? '{}')
   if (saved.tab === 'mine' || saved.tab === 'toReview') state.tab = saved.tab
   state.onlyPending = saved.onlyPending === true
+  state.staleOpen = saved.staleOpen === true
 } catch {
   // per-viewer convenience only
 }
 
 function remember() {
   try {
-    localStorage.setItem('ui', JSON.stringify({ tab: state.tab, onlyPending: state.onlyPending }))
+    localStorage.setItem('ui', JSON.stringify({ tab: state.tab, onlyPending: state.onlyPending, staleOpen: state.staleOpen }))
   } catch {
     // ignore
   }
@@ -66,6 +69,14 @@ function ago(iso) {
 function setText(root, selector, text) {
   const el = root.querySelector(selector)
   if (el) el.textContent = text
+}
+
+/** @param {number} n */
+function countBadge(n) {
+  const el = document.createElement('span')
+  el.className = 'n'
+  el.textContent = String(n)
+  return el
 }
 
 /** @param {string} text @param {string} [cls] */
@@ -134,8 +145,9 @@ function renderFinding(f, viewer) {
 /**
  * @param {ReviewPR} pr
  * @param {string} viewer
+ * @param {boolean} showRepo  false inside a service group, where the heading already names it
  */
-function renderPR(pr, viewer) {
+function renderPR(pr, viewer, showRepo) {
   const tpl = /** @type {HTMLTemplateElement} */ ($('pr-tpl'))
   const el = /** @type {HTMLElement} */ (tpl.content.firstElementChild?.cloneNode(true))
   el.dataset.id = pr.id
@@ -149,11 +161,8 @@ function renderPR(pr, viewer) {
   const title = /** @type {HTMLAnchorElement} */ (el.querySelector('.title'))
   title.textContent = `#${pr.number} ${pr.title}`
   title.href = pr.url
-  setText(
-    el,
-    '.repo',
-    state.tab === 'toReview' ? `${pr.repo} · by ${pr.author} · updated ${ago(pr.updatedAt)}` : `${pr.repo} · updated ${ago(pr.updatedAt)}`,
-  )
+  const meta = [showRepo ? pr.repo : '', state.tab === 'toReview' ? `by ${pr.author}` : '', `updated ${ago(pr.updatedAt)}`]
+  setText(el, '.repo', meta.filter(Boolean).join(' · '))
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
   if (pr.isDraft) chips.append(chip('Draft', 'c-draft'))
@@ -206,7 +215,38 @@ function paint() {
     return
   }
   const prs = /** @type {ReviewPR[]} */ (snap[state.tab]).filter((p) => !state.onlyPending || p.counts.pending > 0)
-  for (const pr of prs) list.append(renderPR(pr, snap.viewer))
+  const { services, stale } = groupPRs(prs)
+  for (const group of services) {
+    const section = document.createElement('section')
+    section.className = 'group'
+    section.dataset.group = group.name
+    const head = document.createElement('h2')
+    head.className = 'group-head'
+    head.textContent = group.name
+    head.append(countBadge(group.prs.length))
+    section.append(head, ...group.prs.map((pr) => renderPR(pr, snap.viewer, false)))
+    list.append(section)
+  }
+  if (stale.length) {
+    const box = document.createElement('details')
+    box.className = 'group stale'
+    box.dataset.group = 'stale'
+    box.open = state.staleOpen
+    box.addEventListener('toggle', () => {
+      state.staleOpen = box.open
+      remember()
+    })
+    const head = document.createElement('summary')
+    head.className = 'group-head'
+    head.textContent = 'Stale'
+    head.append(countBadge(stale.length))
+    const note = document.createElement('span')
+    note.className = 'group-note'
+    note.textContent = `no activity for ${STALE_DAYS}+ days`
+    head.append(note)
+    box.append(head, ...stale.map((pr) => renderPR(pr, snap.viewer, true)))
+    list.append(box)
+  }
   empty.hidden = prs.length > 0
   empty.textContent = state.onlyPending ? 'Nothing unfixed here.' : 'No open PRs here.'
   if (snap.truncated[state.tab]) {
