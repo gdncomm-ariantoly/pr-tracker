@@ -56,6 +56,19 @@ describe('fetchDashboard', () => {
   })
 })
 
+describe('partial errors', () => {
+  it('keeps GitHub errors that arrive alongside data (SAML hides every org PR)', async () => {
+    const empty = { ...DATA, mine: { issueCount: 0, nodes: [] }, requested: { issueCount: 0, nodes: [] }, reviewed: { issueCount: 0, nodes: [] } }
+    const saml = 'Resource protected by organization SAML enforcement. You must grant your Personal Access token access to this organization.'
+    const s = await fetchDashboard({ token: 't', fetchImpl: fakeFetch(200, { data: empty, errors: [{ type: 'FORBIDDEN', message: saml }, { type: 'FORBIDDEN', message: saml }] }) })
+    assert.equal(s.warnings?.length, 1, 'deduplicated')
+    assert.match(s.warnings?.[0] ?? '', /SAML.*Configure SSO/)
+  })
+  it('has no warnings on a clean response', () => {
+    assert.deepEqual(toSnapshot(DATA).warnings, [])
+  })
+})
+
 describe('refresh', () => {
   it('persists the snapshot and clears the error', async () => {
     const area = fakeArea({ settings: { token: 't' }, lastError: 'old' })

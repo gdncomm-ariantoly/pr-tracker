@@ -167,6 +167,10 @@ function paint() {
   }
   input('only-pending').checked = state.onlyPending
 
+  const warn = $('warning')
+  warn.hidden = !snap?.warnings?.length
+  warn.textContent = snap?.warnings?.length ? `GitHub hid some results: ${snap.warnings.join(' · ')}` : ''
+
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
   $('fetched').textContent = snap ? `updated ${ago(snap.fetchedAt)}` : ''
 

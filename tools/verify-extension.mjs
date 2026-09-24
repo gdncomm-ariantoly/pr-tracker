@@ -112,7 +112,10 @@ async function verify(context, id) {
   let mode = 'ok'
   await context.route('https://api.github.com/graphql', async (route) => {
     authHeaders.push(route.request().headers().authorization ?? '')
-    if (mode === 'sso') {
+    if (mode === 'saml-partial') {
+      const empty = { ...fixture.data, mine: { issueCount: 0, nodes: [] }, requested: { issueCount: 0, nodes: [] }, reviewed: { issueCount: 0, nodes: [] } }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: empty, errors: [{ type: 'FORBIDDEN', message: 'Resource protected by organization SAML enforcement.' }] }) })
+    } else if (mode === 'sso') {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Resource protected by organization SAML enforcement.' }] }) })
     } else {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) })
@@ -216,6 +219,18 @@ async function verify(context, id) {
   fixture.data = original
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+
+  // SSO not authorised: GitHub returns 200 with empty lists *and* errors. The
+  // user must see why the lists are empty.
+  mode = 'saml-partial'
+  await page.click('#refresh')
+  await page.waitForSelector('#warning:not([hidden])')
+  check('SSO partial error is shown as a warning, not an empty page', ((await page.textContent('#warning')) ?? '').includes('Configure SSO'))
+  mode = 'ok'
+  await page.click('#refresh')
+  await page.waitForSelector('#warning[hidden]', { state: 'attached' })
+  check('warning clears once GitHub stops sending it', await page.isHidden('#warning'))
+  await page.check('#only-pending')
 
   mode = 'sso'
   await page.click('#refresh')
