@@ -72,7 +72,19 @@ describe('partial errors', () => {
     assert.equal(s.mine.length, 2)
     assert.match(s.warnings?.[0] ?? '', /Could not read comments on o\/r#1/)
   })
-  it('explains a fine-grained token that lacks access', () => {
+  it('explains fine-grained access errors by what they hid', () => {
+    const msg = 'Resource not accessible by personal access token'
+    const s = toSnapshot(DATA, [], [
+      { type: 'FORBIDDEN', message: msg, path: ['reviewed', 'nodes', 2] },
+      { type: 'FORBIDDEN', message: msg, path: ['requested', 'nodes', 0] },
+      { type: 'FORBIDDEN', message: msg, path: ['mine', 'nodes', 1, 'commits'] },
+      { type: 'FORBIDDEN', message: msg, path: ['mine', 'nodes', 3, 'commits'] },
+    ])
+    assert.equal(s.warnings?.length, 2)
+    assert.match(s.warnings?.[0] ?? '', /missing Contents: Read-only/)
+    assert.match(s.warnings?.[1] ?? '', /^2 PRs are in repositories your token doesn't cover/)
+  })
+  it('falls back to the checklist when it cannot tell what was hidden', () => {
     const s = toSnapshot(DATA, [], [{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token' }])
     assert.match(s.warnings?.[0] ?? '', /pending approval.*Resource owner gdncomm/)
   })

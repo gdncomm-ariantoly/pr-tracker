@@ -169,7 +169,7 @@ function paint() {
 
   const warn = $('warning')
   warn.hidden = !snap?.warnings?.length
-  warn.textContent = snap?.warnings?.length ? `GitHub hid some results: ${snap.warnings.join(' · ')}` : ''
+  warn.textContent = snap?.warnings?.join(' ') ?? ''
 
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
   $('fetched').textContent = snap ? `updated ${ago(snap.fetchedAt)}` : ''
