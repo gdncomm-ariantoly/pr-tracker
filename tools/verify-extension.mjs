@@ -225,7 +225,7 @@ async function verify(context, id) {
   mode = 'saml-partial'
   await page.click('#refresh')
   await page.waitForSelector('#warning:not([hidden])')
-  check('SSO partial error is shown as a warning, not an empty page', ((await page.textContent('#warning')) ?? '').includes('Configure SSO'))
+  check('SSO partial error is shown as a warning, not an empty page', ((await page.textContent('#warning')) ?? '').includes('fine-grained'))
   mode = 'ok'
   await page.click('#refresh')
   await page.waitForSelector('#warning[hidden]', { state: 'attached' })

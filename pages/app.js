@@ -235,7 +235,7 @@ $('settings').addEventListener('submit', async (event) => {
     notify: input('notify').checked,
   })
   input('token').value = ''
-  input('token').placeholder = typed || current.token ? 'Token saved — paste a new one to replace it' : 'ghp_… or github_pat_…'
+  input('token').placeholder = typed || current.token ? 'Token saved — paste a new one to replace it' : 'github_pat_…'
   $('settings').hidden = true
   $('toggle-settings').setAttribute('aria-expanded', 'false')
   await doRefresh()

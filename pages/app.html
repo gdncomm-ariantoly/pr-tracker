@@ -19,8 +19,8 @@
     <form class="settings" id="settings" hidden>
       <label>
         GitHub token
-        <input type="password" id="token" autocomplete="off" spellcheck="false" placeholder="ghp_… or github_pat_…" />
-        <small class="muted">Classic PAT with <code>repo</code> scope (or fine-grained with Pull requests: read). If your org uses SAML SSO, click <em>Configure SSO → Authorize</em> for it on the token page. Stored only in this browser (<code>chrome.storage.local</code>).</small>
+        <input type="password" id="token" autocomplete="off" spellcheck="false" placeholder="github_pat_…" />
+        <small class="muted">Fine-grained token, Resource owner <strong>gdncomm</strong>, All repositories, Pull requests + Contents: Read-only. If it shows <em>pending</em> on GitHub, wait for org approval. Stored only in this browser (<code>chrome.storage.local</code>).</small>
       </label>
       <label>
         Extra bot logins
@@ -44,7 +44,7 @@
       </label>
       <div class="row">
         <button type="submit" class="primary">Save</button>
-        <a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=PR%20Tracker" target="_blank" rel="noopener">Create a token ↗</a>
+        <a href="https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&amp;description=Read-only+PR+dashboard&amp;target_name=gdncomm&amp;expires_in=90&amp;pull_requests=read&amp;contents=read" target="_blank" rel="noopener">Create a fine-grained token ↗</a>
       </div>
     </form>
 

@@ -62,7 +62,7 @@ describe('partial errors', () => {
     const saml = 'Resource protected by organization SAML enforcement. You must grant your Personal Access token access to this organization.'
     const s = await fetchDashboard({ token: 't', fetchImpl: fakeFetch(200, { data: empty, errors: [{ type: 'FORBIDDEN', message: saml }, { type: 'FORBIDDEN', message: saml }] }) })
     assert.equal(s.warnings?.length, 1, 'deduplicated')
-    assert.match(s.warnings?.[0] ?? '', /SAML.*Configure SSO/)
+    assert.match(s.warnings?.[0] ?? '', /SAML.*fine-grained token with Resource owner gdncomm/)
   })
   it('one unreadable PR does not blank the dashboard', () => {
     // A comment without createdAt: nothing GitHub should send, but analysis throws on it.
@@ -71,6 +71,10 @@ describe('partial errors', () => {
     const s = toSnapshot({ ...DATA, mine: { issueCount: 2, nodes: [broken, ...DATA.mine.nodes] } })
     assert.equal(s.mine.length, 2)
     assert.match(s.warnings?.[0] ?? '', /Could not read comments on o\/r#1/)
+  })
+  it('explains a fine-grained token that lacks access', () => {
+    const s = toSnapshot(DATA, [], [{ type: 'FORBIDDEN', message: 'Resource not accessible by personal access token' }])
+    assert.match(s.warnings?.[0] ?? '', /pending approval.*Resource owner gdncomm/)
   })
   it('has no warnings on a clean response', () => {
     assert.deepEqual(toSnapshot(DATA).warnings, [])

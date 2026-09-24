@@ -207,21 +207,34 @@
         <div class="detail"><p>Click the puzzle-piece icon next to the address bar, then the pin next to PR Tracker. The badge on it shows how many PRs are waiting for your review.</p></div>
       </li>
       <li>
-        <h3>Add a GitHub token</h3>
+        <h3>Create a fine-grained token for gdncomm</h3>
         <div class="detail">
-          <p>Click the icon. Settings opens the first time. Create a <strong>classic</strong> token with the <code>repo</code> scope, paste it in, and click <strong>Save</strong>.</p>
-          <p><a href="https://github.com/settings/tokens/new?scopes=repo&amp;description=PR%20Tracker" target="_blank" rel="noopener">Create a token with repo scope pre-selected ↗</a></p>
+          <p>Open the link below. It pre-fills the name, <strong>Resource owner = gdncomm</strong>, and read-only access to <strong>Pull requests</strong> and <strong>Contents</strong>. You still need to pick the repository access yourself:</p>
+          <ul class="plain">
+            <li><strong>Repository access:</strong> All repositories</li>
+            <li><strong>Permissions:</strong> Pull requests: Read-only, Contents: Read-only (Metadata: Read-only is added automatically)</li>
+            <li><strong>Expiration:</strong> 90 days is pre-filled. Choose anything our org policy allows.</li>
+          </ul>
+          <p><a href="https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&amp;description=Read-only+PR+dashboard&amp;target_name=gdncomm&amp;expires_in=90&amp;pull_requests=read&amp;contents=read" target="_blank" rel="noopener">Create a fine-grained token for gdncomm ↗</a></p>
+          <p>If gdncomm doesn't appear under Resource owner, sign in to the org's SSO on github.com first, then reload the page.</p>
         </div>
       </li>
       <li>
-        <h3>Authorize the token for our org's SSO</h3>
+        <h3>Wait for approval if it says "pending"</h3>
         <div class="detail">
-          <p>On the token list, click <strong>Configure SSO</strong> next to the new token, then <strong>Authorize</strong> for <code>gdncomm</code>. If you skip this, the dashboard shows a "SAML enforcement" error and no private repos.</p>
+          <p>If the org requires approval for fine-grained tokens, the new token shows as <strong>pending</strong> until a gdncomm admin approves it, and the dashboard stays empty until then. You don't need the "Configure SSO" step used for classic tokens.</p>
+        </div>
+      </li>
+      <li>
+        <h3>Paste it into PR Tracker</h3>
+        <div class="detail">
+          <p>Click the toolbar icon. Settings opens the first time. Paste the token (it starts with <code>github_pat_</code>) and click <strong>Save</strong>.</p>
         </div>
       </li>
     </ol>
     <div class="note">
-      <p><strong>Your token stays on your computer.</strong> It's saved in this Chrome profile's extension storage and sent only to <code>api.github.com</code>. There's no server in between. The extension only reads from GitHub. It never comments, approves or pushes.</p>
+      <p><strong>Only gdncomm repos appear.</strong> A fine-grained token covers a single owner, so PRs in personal or other orgs' repos aren't shown. That's intended.</p>
+      <p style="margin-top:8px"><strong>Your token stays on your computer.</strong> It's saved in this Chrome profile's extension storage and sent only to <code>api.github.com</code>. There's no server in between. The extension only reads from GitHub. It never comments, approves or pushes.</p>
     </div>
   </section>
 
@@ -245,12 +258,25 @@
     <h2 id="trouble">If something's off</h2>
     <div>
       <details>
+        <summary>The lists are empty, or "Resource not accessible by personal access token"</summary>
+        <div>
+          <p>Check these in order on <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener">your fine-grained tokens</a>:</p>
+          <ul class="plain">
+            <li>The token isn't still <strong>pending</strong> org approval.</li>
+            <li>Resource owner is <strong>gdncomm</strong>, not your personal account.</li>
+            <li>Repository access is <strong>All repositories</strong>.</li>
+            <li>Pull requests and Contents are both <strong>Read-only</strong>.</li>
+          </ul>
+          <p>Fix it on the token page (you don't need a new token), then click Refresh.</p>
+        </div>
+      </details>
+      <details>
         <summary>"Resource protected by organization SAML enforcement"</summary>
-        <div><p>The token isn't authorized for the org yet. Do step 6 (Configure SSO → Authorize), then click Refresh.</p></div>
+        <div><p>You're using a classic token (<code>ghp_…</code>) that isn't authorized for SSO. Either switch to a fine-grained token as described above, or open the classic token → Configure SSO → Authorize for gdncomm.</p></div>
       </details>
       <details>
         <summary>"GitHub rejected the token (401)"</summary>
-        <div><p>The token expired or was deleted. Create a new one, open Settings and paste it in. Tokens with no expiry avoid this, if your policy allows them.</p></div>
+        <div><p>The token expired or was deleted. Open it on GitHub and click <strong>Regenerate token</strong> (it keeps the same settings), then paste the new value into Settings.</p></div>
       </details>
       <details>
         <summary>Chrome warns about developer-mode extensions at startup</summary>

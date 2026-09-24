@@ -26,9 +26,13 @@ Clicking a notification opens that comment on GitHub. More than 4 updates at onc
 
 ## Setup
 
-1. Create a token: classic PAT with `repo` scope (or fine-grained, Pull requests: read).
-2. If your org enforces SAML SSO, open the token → **Configure SSO** → **Authorize** for the org, or every private PR is invisible.
-3. Open PR Tracker → Settings → paste it → Save. It is stored only in `chrome.storage.local` of this browser and sent only to `api.github.com`.
+1. Create a **fine-grained** token with Resource owner **gdncomm** ([pre-filled link](https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&description=Read-only+PR+dashboard&target_name=gdncomm&expires_in=90&pull_requests=read&contents=read)):
+   - Repository access: **All repositories**
+   - Permissions: **Pull requests: Read-only**, **Contents: Read-only** (Metadata is automatic)
+2. If the org requires approval, wait until the token is no longer **pending**. No "Configure SSO" step is needed for fine-grained tokens.
+3. Open PR Tracker → Settings → paste it → Save.
+
+Only gdncomm repositories are covered: a fine-grained token has a single resource owner. A classic `repo` token also works (authorize it for SSO), but it grants far more than this read-only dashboard needs. It is stored only in `chrome.storage.local` of this browser and sent only to `api.github.com`.
 
 ## Install
 
