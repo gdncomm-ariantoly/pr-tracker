@@ -4,7 +4,7 @@ import { markRead, normaliseInbox, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
-import { deployJenkinsLink, JENKINS_TEMPLATE, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
+import { deployJenkinsLink, JENKINS_TEMPLATE, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -166,6 +166,9 @@ function excerpt(body) {
   const text = body.replace(/<!--[\s\S]*?-->/g, '').trim()
   return text.length > 600 ? `${text.slice(0, 599)}…` : text
 }
+
+/** Watched repos as typed in Settings: gdncomm ones by bare name. */
+const showRepos = (/** @type {string[]} */ repos) => repos.map((r) => r.replace(/^gdncomm\//, '')).join(', ')
 
 /**
  * The author's GitHub avatar, or their initial when GitHub gave none.
@@ -340,7 +343,7 @@ function renderPR(pr, viewer, showRepo) {
     if (job) chips.append(jobChip(job))
   }
   if (pr.isDraft) chips.append(chip('Draft', 'c-draft'))
-  if (state.tab === 'toReview') chips.append(pr.requested ? chip('Review requested', 'c-req') : chip('Reviewed by you', 'c-muted'))
+  if (state.tab === 'toReview') chips.append(pr.requested ? chip('Review requested', 'c-req') : pr.watched ? chip('Watched repo', 'c-watch') : chip('Reviewed by you', 'c-muted'))
   if (pr.reviewDecision && DECISION_LABEL[pr.reviewDecision]) {
     chips.append(chip(DECISION_LABEL[pr.reviewDecision], `c-${pr.reviewDecision.toLowerCase()}`))
   }
@@ -546,11 +549,15 @@ $('settings').addEventListener('submit', async (event) => {
 
   const current = await loadSettings()
   const typed = input('token').value.trim()
+  const watchedBox = /** @type {HTMLTextAreaElement} */ ($('watched'))
+  const watchedRepos = parseRepos(parseList(watchedBox.value))
+  watchedBox.value = showRepos(watchedRepos) // what will actually be searched
   await saveSettings({
     token: typed || current.token,
     extraBots: parseList(/** @type {HTMLTextAreaElement} */ ($('bots')).value),
     refreshMinutes: Number(/** @type {HTMLSelectElement} */ ($('minutes')).value),
     notify: input('notify').checked,
+    watchedRepos,
     jenkinsUser: input('jenkins-user').value.trim(),
     jenkinsToken: typedJenkins || current.jenkinsToken,
   })
@@ -641,6 +648,8 @@ async function init() {
   paintInbox()
   const bots = /** @type {HTMLTextAreaElement} */ ($('bots'))
   bots.value = settings.extraBots.join(', ')
+  const watched = /** @type {HTMLTextAreaElement} */ ($('watched'))
+  watched.value = showRepos(settings.watchedRepos)
   const minutes = /** @type {HTMLSelectElement} */ ($('minutes'))
   minutes.value = String(settings.refreshMinutes)
   input('notify').checked = settings.notify

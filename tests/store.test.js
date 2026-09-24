@@ -1,13 +1,21 @@
 import assert from 'node:assert/strict'
 import { it } from 'node:test'
 
-import { DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList } from '../lib/store.js'
+import { DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList, parseRepos } from '../lib/store.js'
 
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
   assert.deepEqual(normalise({ token: ' x ', extraBots: ['Jenkins', 3, ''], refreshMinutes: -5 }), {
-    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsUser: '', jenkinsToken: '',
+    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsUser: '', jenkinsToken: '', watchedRepos: [],
   })
+})
+
+it('reads watched repos: bare names are gdncomm, URLs are accepted, junk is dropped', () => {
+  assert.deepEqual(
+    parseRepos(['product-feed', 'Acme/API', 'https://github.com/gdncomm/seo-backend/', 'gdncomm/product-feed', 'x y', 'repo:evil', 'a/b/c']),
+    ['gdncomm/product-feed', 'acme/api', 'gdncomm/seo-backend', 'a/b'],
+  )
+  assert.deepEqual(normalise({ watchedRepos: ['product-feed', 7] }).watchedRepos, ['gdncomm/product-feed'])
 })
 
 it('parses a comma/newline list', () => {

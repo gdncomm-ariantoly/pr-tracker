@@ -32,6 +32,11 @@
         <small class="muted">Accounts that are bots but show up as normal users. GitHub App bots and <code>*[bot]</code> are excluded automatically.</small>
       </label>
       <label>
+        Watched repositories
+        <textarea id="watched" rows="2" spellcheck="false" placeholder="product-feed, seo-backend"></textarea>
+        <small class="muted">Open PRs in these repos show under <em>To review</em> even when nobody added you as a reviewer (drafts and your own PRs excluded). A bare name means <code>gdncomm/…</code>; up to 20.</small>
+      </label>
+      <label>
         Auto-refresh every
         <select id="minutes">
           <option value="0">never</option>

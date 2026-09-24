@@ -111,6 +111,8 @@ async function verify(context, id) {
   /** @type {string[]} */
   const authHeaders = []
   let mode = 'ok'
+  /** @type {string[]} */
+  const watchedQueries = []
   await context.route('https://api.github.com/graphql', async (route) => {
     authHeaders.push(route.request().headers().authorization ?? '')
     if (mode === 'jenkins-hidden') {
@@ -125,7 +127,11 @@ async function verify(context, id) {
     } else if (mode === 'sso') {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Resource protected by organization SAML enforcement.' }] }) })
     } else {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) })
+      // Watched repos: GitHub would return their open PRs under the `watched` alias.
+      const vars = JSON.parse(route.request().postData() ?? '{}').variables ?? {}
+      const watched = vars.hasWatched ? { watched: { issueCount: 1, nodes: [{ ...fixture.data.mine.nodes[0], id: 'WATCHED1', number: 900, title: 'Someone else\'s change', author: { login: 'dave', __typename: 'User' } }] } } : {}
+      watchedQueries.push(vars.hasWatched ? vars.watched : '')
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...fixture, data: { ...fixture.data, ...watched } }) })
     }
   })
 
@@ -368,6 +374,23 @@ async function verify(context, id) {
   fixture.data = original
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+
+  // Watched repos: their PRs join To review, labelled, without a review request.
+  await page.click('#toggle-settings')
+  await page.fill('#watched', 'api, https://github.com/acme/web')
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  await page.click('#tab-toReview')
+  await page.waitForSelector('article.pr[data-id="WATCHED1"]', { state: 'attached' })
+  check('watched repos are searched by full name', / repo:gdncomm\/api repo:acme\/web$/.test(watchedQueries.at(-1) ?? ''), watchedQueries.at(-1))
+  check('a watched PR shows under To review, labelled', ((await page.locator('article.pr[data-id="WATCHED1"] .chip.c-watch').textContent()) ?? '') === 'Watched repo')
+  await page.click('#toggle-settings')
+  check('Settings shows the list back, gdncomm/ dropped', (await page.inputValue('#watched')) === 'api, acme/web')
+  await page.fill('#watched', '')
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  check('clearing the list stops the watched search', watchedQueries.at(-1) === '' && (await page.locator('article.pr[data-id="WATCHED1"]').count()) === 0)
+  await page.click('#tab-mine')
 
   // Build status hidden from the token: fall back to a Jenkins job link, no standing banner.
   mode = 'jenkins-hidden'

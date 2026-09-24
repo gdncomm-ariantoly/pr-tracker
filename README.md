@@ -1,6 +1,6 @@
 # PR Tracker
 
-Click the toolbar icon to open a dashboard of **your open PRs** and **PRs waiting for your review** (review requested, plus open PRs you already reviewed) on github.com. Each PR says whether any human (non-bot) has commented, lists those comments, and marks each one fixed or not:
+Click the toolbar icon to open a dashboard of **your open PRs** and **PRs waiting for your review** (review requested, open PRs you already reviewed, and open PRs in any *watched repositories* you list in Settings) on github.com. Each PR says whether any human (non-bot) has commented, lists those comments, and marks each one fixed or not:
 
 | Status | Counts as | Evidence |
 |---|---|---|
@@ -34,6 +34,8 @@ Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployme
 **Status straight from Jenkins (API token).** GitHub doesn't show Jenkins check runs to fine-grained tokens, so pass/fail comes from Jenkins itself. Settings → *Jenkins API token* takes your Jenkins user ID and an API token (Jenkins → your name → Security/Configure → API Token → Add new token). Saving it asks Chrome for access to the Jenkins host (`*.gdn-app.com`). Each refresh then asks `…/PR-{number}/lastBuild/api/json` with HTTP Basic auth, at most 6 at a time. The browser's Jenkins session is never used. No job (404): no chip. A rejected token (401): red banner. Without a token, PRs show a plain **Jenkins ↗** link and a banner offers adding one. Jenkins tokens are not scoped: it carries your full Jenkins rights, though PR Tracker only reads with it. It's stored in `chrome.storage.local` like the GitHub token.
 
 ### Layout
+
+**Watched repositories** (Settings, up to 20; a bare name means `gdncomm/…`, a github.com URL works too) add every open, non-draft PR in those repos that you didn't write to *To review*, labelled *Watched repo*, so you see them even when nobody requests your review. A new PR in a repo that was already watched also raises a *New PR* update.
 
 Each tab is grouped by service (the repository name without `gdncomm/`). Order is "what needs me first": PRs with unfixed comments, then PRs with comments (all fixed or no action needed), then PRs without human comments, newest update first within each. Groups follow their most urgent PR, except deployment repos (`prod-*`, `nonprod-*`), which always come after the services. Comments you mark *No action needed* stop counting as unfixed for sorting too. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
 

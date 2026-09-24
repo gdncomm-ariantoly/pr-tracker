@@ -89,4 +89,11 @@ describe('diffSnapshots', () => {
     const s = snap({ mine: [pr({ findings: [finding({})] })], toReview: [pr({ id: 'P2', requested: true })] })
     assert.deepEqual(diffSnapshots(s, structuredClone(s)), [])
   })
+
+  it('reports a new PR in a repo that was already watched, not a newly watched one', () => {
+    const w = pr({ id: 'W', repo: 'o/API', author: 'dave', requested: false, watched: true })
+    const before = snap({ watchedRepos: ['o/api'] })
+    assert.deepEqual(diffSnapshots(before, snap({ watchedRepos: ['o/api'], toReview: [w] })).map((e) => e.title), ['New PR · API#1'])
+    assert.deepEqual(diffSnapshots(snap({}), snap({ watchedRepos: ['o/api'], toReview: [w] })), [])
+  })
 })

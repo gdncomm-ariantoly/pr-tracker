@@ -127,6 +127,7 @@ details.stale .pr { opacity: .8; }
 .c-pending, .c-changes_requested { background: var(--bad-bg); color: var(--bad-fg); }
 .c-review_required { background: var(--warn-bg); color: var(--warn-fg); }
 .c-req { background: var(--pink-bg); color: var(--pink-fg); }
+.c-watch { background: var(--info-bg); color: var(--info-fg); }
 a.chip.build { text-decoration: none; }
 a.chip.build:hover { text-decoration: underline; }
 .chip.build::before { content: "●"; margin-right: 4px; font-size: 9px; vertical-align: 1px; }

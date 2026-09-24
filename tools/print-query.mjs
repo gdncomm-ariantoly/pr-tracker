@@ -1,5 +1,7 @@
 // Prints the extension's exact GraphQL request body, for capturing a real fixture:
 //   gh api graphql --input <(node tools/print-query.mjs) > /tmp/dashboard.json
-import { DASHBOARD_QUERY, SEARCHES } from '../lib/github.js'
+// Watched repos as arguments: node tools/print-query.mjs gdncomm/product-feed
+import { DASHBOARD_QUERY, SEARCHES, watchedSearch } from '../lib/github.js'
 
-process.stdout.write(JSON.stringify({ query: DASHBOARD_QUERY, variables: SEARCHES }))
+const watched = process.argv.slice(2)
+process.stdout.write(JSON.stringify({ query: DASHBOARD_QUERY, variables: { ...SEARCHES, watched: watchedSearch(watched), hasWatched: watched.length > 0 } }))

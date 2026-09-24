@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { fetchDashboard, GitHubError, toSnapshot } from '../lib/github.js'
+import { fetchDashboard, GitHubError, toSnapshot, watchedSearch } from '../lib/github.js'
 import { badgeFor, refresh } from '../lib/refresh.js'
 
 /** @param {string} id @param {string} updatedAt */
@@ -111,5 +111,34 @@ describe('refresh', () => {
     await assert.rejects(refresh({ area, fetchImpl: fakeFetch(502, { message: 'Bad gateway' }) }))
     assert.equal(/** @type {any} */ (area.data.snapshot).viewer, 'old')
     assert.match(String(area.data.lastError), /502/)
+  })
+})
+
+describe('watched repositories', () => {
+  it('searches only when there is something to watch', async () => {
+    /** @type {any[]} */
+    const sent = []
+    const fetchImpl = /** @type {typeof fetch} */ (/** @type {unknown} */ (async (/** @type {string} */ _url, /** @type {any} */ init) => {
+      sent.push(JSON.parse(init.body).variables)
+      return new Response(JSON.stringify({ data: { viewer: { login: 'me' }, rateLimit: { remaining: 1 }, mine: { nodes: [] }, requested: { nodes: [] }, reviewed: { nodes: [] } } }))
+    }))
+    await fetchDashboard({ token: 't', fetchImpl })
+    const snap = await fetchDashboard({ token: 't', watchedRepos: ['gdncomm/a', 'gdncomm/b'], fetchImpl })
+    assert.equal(sent[0].hasWatched, false)
+    assert.equal(sent[1].hasWatched, true)
+    assert.equal(sent[1].watched, watchedSearch(['gdncomm/a', 'gdncomm/b']))
+    assert.match(sent[1].watched, /-author:@me .*repo:gdncomm\/a repo:gdncomm\/b$/)
+    assert.deepEqual(snap.watchedRepos, ['gdncomm/a', 'gdncomm/b'])
+  })
+
+  it('adds watched PRs to To review, without relabelling ones I am already on', () => {
+    const snap = toSnapshot({
+      viewer: { login: 'me' },
+      requested: { nodes: [node('R', '2026-01-02T00:00:00Z')] },
+      reviewed: { nodes: [] },
+      mine: { nodes: [] },
+      watched: { nodes: [node('R', '2026-01-02T00:00:00Z'), node('W', '2026-01-01T00:00:00Z')] },
+    })
+    assert.deepEqual(snap.toReview.map((p) => [p.id, p.requested, !!p.watched]), [['R', true, false], ['W', false, true]])
   })
 })
