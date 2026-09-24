@@ -4,7 +4,7 @@ import { markRead, normaliseInbox, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
-import { deployJenkinsLink, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
+import { deployJenkinsLink, JENKINS_TEMPLATE, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -38,7 +38,6 @@ const state = {
   /** @type {Snapshot | null} */ snapshot: null,
   /** @type {Set<string>} */ open: new Set(),
   /** @type {import('../lib/overrides.js').Overrides} */ overrides: {},
-  jenkinsTemplate: '',
   jenkinsHidden: false,
   jenkinsGranted: false,
   jenkinsHasToken: false,
@@ -337,7 +336,7 @@ function renderPR(pr, viewer, showRepo) {
   else if (state.jenkinsHidden && !state.snapshot?.jenkinsChecked) {
     // Only guess the job link when GitHub is hiding builds from the token; a PR
     // whose builds are visible but absent (deployment repos) has no job to link.
-    const job = jenkinsJobUrl(state.jenkinsTemplate, pr)
+    const job = jenkinsJobUrl(JENKINS_TEMPLATE, pr)
     if (job) chips.append(jobChip(job))
   }
   if (pr.isDraft) chips.append(chip('Draft', 'c-draft'))
@@ -392,12 +391,12 @@ function paint() {
 
   const warn = $('warning')
   // With a Jenkins link to fall back on, a hidden build status isn't worth a standing banner.
-  const warnings = (snap?.warnings ?? []).filter((w) => !(state.jenkinsTemplate && w.startsWith(JENKINS_HIDDEN)))
+  const warnings = (snap?.warnings ?? []).filter((w) => !w.startsWith(JENKINS_HIDDEN))
   warn.hidden = !warnings.length
   warn.textContent = warnings.join(' ')
 
   // Jenkins: while GitHub hides builds, suggest a token; with one, make sure Chrome may use it.
-  const origin = jenkinsOrigin(state.jenkinsTemplate)
+  const origin = jenkinsOrigin(JENKINS_TEMPLATE)
   $('jenkins-access').hidden = !(origin && state.jenkinsHidden && !state.jenkinsHasToken)
   $('jenkins-grant-needed').hidden = !(origin && state.jenkinsHasToken && !state.jenkinsGranted)
   $('jenkins-bad-token').hidden = !snap?.jenkinsBadToken
@@ -542,8 +541,7 @@ $('settings').addEventListener('submit', async (event) => {
   // A new Jenkins token needs the Jenkins host permission. Ask first: Chrome
   // only allows the prompt synchronously inside the click, before any await.
   const typedJenkins = input('jenkins-token').value.trim()
-  const template = input('jenkins').value.trim()
-  const origin = jenkinsOrigin(template)
+  const origin = jenkinsOrigin(JENKINS_TEMPLATE)
   const asking = typedJenkins && origin && !state.jenkinsGranted ? chrome.permissions.request({ origins: [`${origin}/*`] }).catch(() => false) : null
 
   const current = await loadSettings()
@@ -553,7 +551,6 @@ $('settings').addEventListener('submit', async (event) => {
     extraBots: parseList(/** @type {HTMLTextAreaElement} */ ($('bots')).value),
     refreshMinutes: Number(/** @type {HTMLSelectElement} */ ($('minutes')).value),
     notify: input('notify').checked,
-    jenkinsTemplate: template,
     jenkinsUser: input('jenkins-user').value.trim(),
     jenkinsToken: typedJenkins || current.jenkinsToken,
   })
@@ -570,7 +567,7 @@ $('settings').addEventListener('submit', async (event) => {
 
 /** Ask for the Jenkins host permission — must run inside the click, as a user gesture. */
 async function grantJenkins() {
-  const origin = jenkinsOrigin(state.jenkinsTemplate)
+  const origin = jenkinsOrigin(JENKINS_TEMPLATE)
   if (!origin) return
   try {
     state.jenkinsGranted = await chrome.permissions.request({ origins: [`${origin}/*`] })
@@ -615,10 +612,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
     state.snapshot = /** @type {Snapshot} */ (changes.snapshot.newValue)
     paint()
   }
-  if (changes.settings?.newValue) {
-    state.jenkinsTemplate = /** @type {any} */ (changes.settings.newValue).jenkinsTemplate ?? ''
-    paint()
-  }
   if (changes.inbox) {
     state.inbox = normaliseInbox(changes.inbox.newValue)
     paintInbox()
@@ -651,11 +644,9 @@ async function init() {
   const minutes = /** @type {HTMLSelectElement} */ ($('minutes'))
   minutes.value = String(settings.refreshMinutes)
   input('notify').checked = settings.notify
-  input('jenkins').value = settings.jenkinsTemplate
   input('jenkins-user').value = settings.jenkinsUser
   if (settings.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
-  state.jenkinsTemplate = settings.jenkinsTemplate
-  const origin = jenkinsOrigin(settings.jenkinsTemplate)
+  const origin = jenkinsOrigin(JENKINS_TEMPLATE)
   state.jenkinsGranted = origin ? await jenkinsAllowed(origin) : false
   state.jenkinsHasToken = !!(settings.jenkinsUser && settings.jenkinsToken)
   if (settings.token) input('token').placeholder = 'Token saved — paste a new one to replace it'

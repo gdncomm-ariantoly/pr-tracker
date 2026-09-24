@@ -133,6 +133,7 @@ async function verify(context, id) {
   await page.waitForSelector('#empty:not([hidden])')
   check('page loads with no console errors', errors.length === 0, errors[0])
   check('first run opens Settings (no token yet)', await page.isVisible('#settings'))
+  check('Settings has no Jenkins job link field', (await page.locator('#jenkins').count()) === 0)
   check('no request made without a token', authHeaders.length === 0)
 
   await page.fill('#token', 'test-token')

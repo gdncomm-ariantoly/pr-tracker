@@ -6,7 +6,7 @@ import { DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPLATE, normalise
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
   assert.deepEqual(normalise({ token: ' x ', extraBots: ['Jenkins', 3, ''], refreshMinutes: -5 }), {
-    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsTemplate: JENKINS_TEMPLATE, jenkinsUser: '', jenkinsToken: '',
+    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsUser: '', jenkinsToken: '',
   })
 })
 
@@ -24,8 +24,6 @@ it('builds the Jenkins job link from the template', () => {
   assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/prod-deployment-gdn-product-feed', number: 33 }), null)
   assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/nonprod-rundeck-gdn-preprod', number: 46 }), null)
   assert.notEqual(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/product-feed', number: 1 }), null)
-  assert.equal(normalise({ jenkinsTemplate: 'javascript:alert(1)' }).jenkinsTemplate, JENKINS_TEMPLATE, 'https only')
-  assert.equal(normalise({ jenkinsTemplate: '' }).jenkinsTemplate, '', 'empty turns it off')
 })
 
 it('links deployment repos to the Jenkins that runs them', () => {
