@@ -217,6 +217,21 @@ async function verify(context, id) {
   check('finding links to GitHub', ((await first.locator('a.when').getAttribute('href')) ?? '').startsWith('https://github.com/'))
   check('bot comments are not listed', (await page.locator('.finding .who', { hasText: 'productivity-tools-services' }).count()) === 0)
 
+  // Fixed comments start folded to one line; clicking the header opens them.
+  const fixedItem = page.locator('.finding.fixed').first()
+  if (await fixedItem.count()) {
+    check('fixed comments start folded', (await fixedItem.getAttribute('class'))?.includes('folded') === true && (await fixedItem.locator('.body').isHidden()) && (await fixedItem.locator('.preview').isVisible()))
+    check('unfixed comments stay open', (await page.locator('.finding:not(.fixed).folded').count()) === 0)
+    const fixedId = await fixedItem.getAttribute('data-id')
+    await fixedItem.locator('.f-head .who').click()
+    check('clicking a folded comment opens it', await page.locator(`.finding[data-id="${fixedId}"] .body`).isVisible())
+    await page.click('#tab-toReview')
+    await page.click('#tab-mine')
+    check('it stays open across a repaint', await page.locator(`.finding[data-id="${fixedId}"] .body`).isVisible())
+    await page.locator(`.finding[data-id="${fixedId}"] .f-head .who`).click()
+    check('and folds again on a second click', await page.locator(`.finding[data-id="${fixedId}"] .body`).isHidden())
+  }
+
   // Comments render like GitHub (bodyHTML), and hostile HTML is neutralised.
   if (await page.locator('.markdown-body table').count()) {
     check('comments render GitHub formatting (code, tables)', (await page.locator('.markdown-body code').count()) > 0)

@@ -13,7 +13,7 @@ Click the toolbar icon to open a dashboard of **your open PRs** and **PRs waitin
 | No action needed | neither | An approval or clean review: "Verdict: Approve", "No blocking issues", "flagging as solid for a human reviewer". Needs a human approval, not a code change. Or you marked it yourself. |
 | Optional | neither | Explicitly non-blocking: "Nit (non-blocking)", "Approve with suggestions" |
 
-Anything that asks for a change ("before merge", "once … is addressed", "please fix", a blocking or critical note, Changes requested) stays actionable even if it also says something positive. Heuristics miss sometimes, so every unfixed comment has a **No action needed** button, with Undo. Marks are kept in this browser across refreshes.
+Anything that asks for a change ("before merge", "once … is addressed", "please fix", a blocking or critical note, Changes requested) stays actionable even if it also says something positive. Fixed comments are folded to a one-line preview; click one to open it (it stays open until you fold it again). Heuristics miss sometimes, so every unfixed comment has a **No action needed** button, with Undo. Marks are kept in this browser across refreshes.
 
 Bots are excluded: GitHub App accounts, `*[bot]`, plus any logins you list in Settings. The badge shows how many PRs have your review requested; it refreshes on a timer (default 15 min).
 

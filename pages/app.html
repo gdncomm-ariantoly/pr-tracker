@@ -124,6 +124,7 @@
     <template id="finding-tpl">
       <li class="finding">
         <div class="f-head">
+          <button type="button" class="fold" aria-expanded="true" hidden></button>
           <span class="status"></span>
           <strong class="who"></strong>
           <span class="where muted"></span>
@@ -131,6 +132,7 @@
           <button type="button" class="mark"></button>
           <a class="when muted" target="_blank" rel="noopener"></a>
         </div>
+        <p class="preview muted" hidden></p>
         <div class="body markdown-body"></div>
         <button type="button" class="more" hidden>Show more</button>
         <ol class="conversation"></ol>

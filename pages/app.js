@@ -43,6 +43,8 @@ const state = {
   jenkinsGranted: false,
   jenkinsHasToken: false,
   /** @type {import('../lib/inbox.js').InboxItem[]} */ inbox: [],
+  /** Fixed comments the user opened; fixed ones start folded. */
+  /** @type {Set<string>} */ unfolded: new Set(),
 }
 
 /** @param {string} origin */
@@ -194,7 +196,7 @@ function renderFinding(f, viewer) {
   when.title = new Date(f.createdAt).toLocaleString()
   const body = /** @type {HTMLElement} */ (li.querySelector('.body'))
   body.append(renderComment(f.bodyHTML, excerpt(f.body)))
-  collapsible(body, /** @type {HTMLButtonElement} */ (li.querySelector('.more')))
+  const more = /** @type {HTMLButtonElement} */ (li.querySelector('.more'))
 
   // The rest of the thread, as on GitHub: each reply with its author.
   const convo = /** @type {HTMLElement} */ (li.querySelector('.conversation'))
@@ -219,6 +221,37 @@ function renderFinding(f, viewer) {
   }
   convo.hidden = !f.conversation?.length
   setText(li, '.evidence', f.evidence)
+
+  // Fixed comments fold to one line; the header toggles them.
+  const fold = /** @type {HTMLButtonElement} */ (li.querySelector('.fold'))
+  let measured = false
+  const setFolded = (/** @type {boolean} */ folded) => {
+    li.classList.toggle('folded', folded)
+    fold.setAttribute('aria-expanded', String(!folded))
+    fold.textContent = folded ? '▸' : '▾'
+    fold.title = folded ? 'Show this comment' : 'Fold this comment'
+    // "Show more" needs a rendered height, so measure on first unfold.
+    if (!folded && !measured) {
+      measured = true
+      collapsible(body, more)
+    }
+  }
+  if (f.fixed) {
+    fold.hidden = false
+    setText(li, '.preview', excerpt(f.body).replace(/\s+/g, ' ').slice(0, 140) || '(no text)')
+    setFolded(!state.unfolded.has(f.id))
+    const toggle = (/** @type {Event} */ event) => {
+      if (/** @type {HTMLElement} */ (event.target).closest('a, button.mark')) return
+      const folded = !li.classList.contains('folded')
+      if (folded) state.unfolded.delete(f.id)
+      else state.unfolded.add(f.id)
+      setFolded(folded)
+    }
+    li.querySelector('.f-head')?.addEventListener('click', toggle)
+    li.querySelector('.preview')?.addEventListener('click', toggle)
+  } else {
+    setFolded(false)
+  }
 
   // Manual override: only for comments still counted as unfixed, or to undo one.
   const mark = /** @type {HTMLButtonElement} */ (li.querySelector('.mark'))
