@@ -37,7 +37,7 @@ Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployme
 
 ### Layout
 
-**Watched repositories** (Settings, up to 20; a bare name means `gdncomm/…`, a github.com URL works too) add every open, non-draft PR in those repos that you didn't write to *To review*, labelled *Watched repo*, so you see them even when nobody requests your review. A new PR in a repo that was already watched also raises a *New PR* update.
+**Watched repositories** (Settings, up to 20; a bare name means `gdncomm/…`, a github.com URL works too) add every open, non-draft PR in those repos that you didn't write to *To review*, labelled *Watched repo*, so you see them even when nobody requests your review. The **Watched repos** checkbox above the list (To review tab) hides or shows them; the choice is remembered. A PR where you're a requested reviewer, or that you already reviewed, keeps that label and is never hidden by this filter. A new PR in a repo that was already watched also raises a *New PR* update.
 
 Each tab is grouped by service (the repository name without `gdncomm/`). Order is "what needs me first": PRs with unfixed comments, then PRs with comments (all fixed or no action needed), then PRs without human comments, newest update first within each. Groups follow their most urgent PR, except deployment repos (`prod-*`, `nonprod-*`), which always come after the services. Comments you mark *No action needed* stop counting as unfixed for sorting too. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
 

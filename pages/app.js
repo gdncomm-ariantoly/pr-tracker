@@ -34,6 +34,7 @@ const DECISION_LABEL = /** @type {Record<string, string>} */ ({
 const state = {
   /** @type {'toReview' | 'mine'} */ tab: 'toReview',
   onlyPending: false,
+  showWatched: true,
   staleOpen: false,
   /** @type {Snapshot | null} */ snapshot: null,
   /** @type {Set<string>} */ open: new Set(),
@@ -53,6 +54,7 @@ try {
   const saved = JSON.parse(localStorage.getItem('ui') ?? '{}')
   if (saved.tab === 'mine' || saved.tab === 'toReview') state.tab = saved.tab
   state.onlyPending = saved.onlyPending === true
+  state.showWatched = saved.showWatched !== false
   state.staleOpen = saved.staleOpen === true
 } catch {
   // per-viewer convenience only
@@ -60,7 +62,7 @@ try {
 
 function remember() {
   try {
-    localStorage.setItem('ui', JSON.stringify({ tab: state.tab, onlyPending: state.onlyPending, staleOpen: state.staleOpen }))
+    localStorage.setItem('ui', JSON.stringify({ tab: state.tab, onlyPending: state.onlyPending, showWatched: state.showWatched, staleOpen: state.staleOpen }))
   } catch {
     // ignore
   }
@@ -378,6 +380,9 @@ function renderPR(pr, viewer, showRepo) {
   return el
 }
 
+/** Hidden by the Watched repos filter? */
+const shown = (/** @type {ReviewPR} */ pr) => state.showWatched || !pr.watched
+
 function paint() {
   const snap = state.snapshot && applyOverrides(state.snapshot, state.overrides)
   state.jenkinsHidden = !!snap?.warnings?.some((w) => w.startsWith(JENKINS_HIDDEN))
@@ -388,9 +393,14 @@ function paint() {
   for (const tab of /** @type {const} */ (['toReview', 'mine'])) {
     const btn = $(`tab-${tab}`)
     btn.setAttribute('aria-selected', String(state.tab === tab))
-    $(`n-${tab}`).textContent = String(snap?.[tab].length ?? 0)
+    $(`n-${tab}`).textContent = String(snap?.[tab].filter(shown).length ?? 0)
   }
   input('only-pending').checked = state.onlyPending
+  // Watched-repo PRs (nobody asked me) can be hidden; only offered when there are some.
+  const watchedCount = snap?.toReview.filter((p) => p.watched).length ?? 0
+  $('watched-filter').hidden = state.tab !== 'toReview' || watchedCount === 0
+  input('show-watched').checked = state.showWatched
+  $('n-watched').textContent = String(watchedCount)
 
   const warn = $('warning')
   // With a Jenkins link to fall back on, a hidden build status isn't worth a standing banner.
@@ -413,7 +423,7 @@ function paint() {
     empty.textContent = 'No data yet. Add a token in Settings, then Refresh.'
     return
   }
-  const prs = /** @type {ReviewPR[]} */ (snap[state.tab]).filter((p) => !state.onlyPending || p.counts.pending > 0)
+  const prs = /** @type {ReviewPR[]} */ (snap[state.tab]).filter(shown).filter((p) => !state.onlyPending || p.counts.pending > 0)
   const { services, stale } = groupPRs(prs)
   for (const group of services) {
     const section = document.createElement('section')
@@ -605,6 +615,12 @@ for (const btn of document.querySelectorAll('[data-tab]')) {
     paint()
   })
 }
+
+input('show-watched').addEventListener('change', () => {
+  state.showWatched = input('show-watched').checked
+  remember()
+  paint()
+})
 
 input('only-pending').addEventListener('change', () => {
   state.onlyPending = input('only-pending').checked
