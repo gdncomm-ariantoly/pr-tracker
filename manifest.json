@@ -25,6 +25,7 @@
   "host_permissions": [
     "https://api.github.com/*"
   ],
+  "optional_permissions": ["nativeMessaging"],
   "optional_host_permissions": [
     "https://*.gdn-app.com/*",
     "https://api.anthropic.com/*"

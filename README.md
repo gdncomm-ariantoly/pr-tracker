@@ -23,6 +23,22 @@ With an Anthropic API key in Settings (and a model: Opus 5 by default, Sonnet 5 
 
 One call per PR with human comments, only when what Claude would see changed (comments, replies, commits or the model), so a quiet refresh costs nothing; at most 12 new calls per refresh, the rest follow on the next one. Answers are cached in `chrome.storage.local`. Failures, refusals and a rejected key fall back to the rules' guess, with a warning or banner. Saving the key asks Chrome for access to `api.anthropic.com`. The request goes straight from the browser (raw `fetch`, since the extension has no build step to bundle the SDK) with the key in `x-api-key`. **It sends comment text, file paths and commit messages to Anthropic** — check that's allowed for your repositories — and is billed to the key's account, so give the key a spend limit.
 
+### Claude Code sessions (optional)
+
+PR cards can link to the Claude Code sessions on your machine that reviewed or discussed the PR. A **Claude Code · n** chip on the card; inside, each session with *Reviewed* / *Mentioned*, its title, project and time, and **Copy resume command** (`cd '<project>' && claude --resume <session-id>`; resuming is CLI-only, there's no deep link into the desktop app).
+
+This needs a small local helper, because an extension can't read files:
+
+```sh
+sh native/install.sh <extension-id>          # the id and exact command are shown in Settings
+sh native/install.sh <extension-id> --hook   # also mark reviews you post with Claude Code
+sh native/install.sh --uninstall
+```
+
+then Settings → *Claude Code sessions* → **Connect** (asks Chrome for `nativeMessaging`). The helper (`native/host.mjs`) is read-only: on each refresh it scans `~/.claude/projects/*/*.jsonl` for PR links and `gh pr … --repo …` commands (cached by file size and mtime, about 1 s cold, milliseconds after) and returns only session id, project folder, title and time. "Reviewed" means the session posted a review/comment (`gh pr review|comment`), ran `/code-review` or was asked to review that PR. PR Tracker's own repo is skipped. The transcript format is internal to Claude Code, so matching is best-effort and may need updating after Claude Code upgrades; transcripts are deleted after 30 days by default.
+
+`--hook` adds a PreToolUse hook to `~/.claude/settings.json` (backed up first; your other hooks are kept) that appends `<!-- claude-code-session: <id> -->` to reviews and comments posted through `gh pr review|comment --body …` or GitHub MCP tools. It only rewrites the text; your permission prompt still decides. GitHub hides the marker when rendering, and PR Tracker shows a **Claude Code** tag on such comments — for anyone's, so teammates' Claude Code reviews are recognised too (a footer like "Generated with Claude Code" counts as well, without a session id).
+
 ### Jenkins build
 
 Jenkins reports each PR build to GitHub (a check run named "Jenkins CI"). The extension reads it from the PR's head commit, so no Jenkins login is needed, and shows a chip (e.g. **Jenkins #3 passed**, failed, running, queued) that links to the build. If several Jenkins jobs report, the worst one wins.

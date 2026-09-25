@@ -6,6 +6,8 @@ import { refresh } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { CLAUDE_ORIGIN } from '../lib/claude.js'
+import { resumeCommand } from '../lib/sessions.js'
+import { localSessions, nativeAllowed } from '../platform.js'
 import { deployJenkinsLink, JENKINS_TEMPLATE, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
@@ -174,6 +176,34 @@ function excerpt(body) {
   return text.length > 600 ? `${text.slice(0, 599)}…` : text
 }
 
+/** Session id → project folder, from the helper; lets a comment's marker resume in the right place. */
+const localCwd = new Map()
+
+/**
+ * Make `button` copy the command that resumes a Claude Code session.
+ * @param {HTMLButtonElement} button
+ * @param {string} sessionId
+ * @param {string} [cwd]
+ * @param {string} [label]  button text (default: keep it)
+ */
+function ccCopy(button, sessionId, cwd, label) {
+  const command = resumeCommand(sessionId, cwd)
+  if (label) button.textContent = label
+  button.title = `${command}${cwd ? '' : '\n(run it from the project the review was done in)'}`
+  button.addEventListener('click', async (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const before = button.textContent
+    try {
+      await navigator.clipboard.writeText(command)
+      button.textContent = 'Copied'
+    } catch {
+      button.textContent = 'Copy failed'
+    }
+    setTimeout(() => (button.textContent = before), 1500)
+  })
+}
+
 /** Watched repos as typed in Settings: gdncomm ones by bare name. */
 const showRepos = (/** @type {string[]} */ repos) => repos.map((r) => r.replace(/^gdncomm\//, '')).join(', ')
 
@@ -228,6 +258,15 @@ function renderFinding(f, viewer) {
             : 'reviewed'
         : 'commented'
   setText(li, '.action', action)
+  const cc = /** @type {HTMLButtonElement} */ (li.querySelector('.cc'))
+  if (f.viaClaudeCode) {
+    cc.hidden = false
+    if (f.claudeSession) ccCopy(cc, f.claudeSession, localCwd.get(f.claudeSession))
+    else {
+      cc.disabled = true
+      cc.title = 'Written with Claude Code (no session id in the comment)'
+    }
+  }
   const where = li.querySelector('.where')
   if (where) {
     where.textContent = f.kind === 'inline' ? `${f.path}${f.line ? `:${f.line}` : ''}` : ''
@@ -389,10 +428,44 @@ function renderPR(pr, viewer, showRepo) {
     chips.append(chip(DECISION_LABEL[pr.reviewDecision], `c-${pr.reviewDecision.toLowerCase()}`))
   }
 
+  // Claude Code: sessions on this machine (helper), plus comments marked as written with it.
+  for (const s of pr.ccSessions ?? []) localCwd.set(s.sessionId, s.cwd)
+  const marked = pr.findings.some((f) => f.viaClaudeCode)
+  const sessions = pr.ccSessions ?? []
+  if (sessions.length || marked) {
+    const reviewed = sessions.some((s) => s.kind === 'review')
+    const c = chip(sessions.length ? `Claude Code · ${sessions.length}` : 'Claude Code', 'c-cc')
+    c.title = sessions.length ? `${sessions.length} local session${sessions.length === 1 ? '' : 's'}${reviewed ? ', including a review' : ''} — open the card to resume one` : 'Some comments were written with Claude Code'
+    chips.append(c)
+  }
+  const ccBox = /** @type {HTMLElement} */ (el.querySelector('.cc-sessions'))
+  ccBox.hidden = !sessions.length
+  const ccList = /** @type {HTMLElement} */ (ccBox.querySelector('ul'))
+  for (const s of sessions) {
+    const row = document.createElement('li')
+    const kind = document.createElement('span')
+    kind.className = `cc-kind k-${s.kind}`
+    kind.textContent = s.kind === 'review' ? 'Reviewed' : 'Mentioned'
+    const title = document.createElement('span')
+    title.className = 'cc-title'
+    title.textContent = s.title || s.sessionId
+    title.title = s.sessionId
+    const where = document.createElement('span')
+    where.className = 'muted cc-where'
+    where.textContent = [s.cwd.split('/').pop(), s.lastAt ? ago(s.lastAt) : ''].filter(Boolean).join(' · ')
+    where.title = s.cwd
+    const copy = document.createElement('button')
+    copy.type = 'button'
+    copy.className = 'cc-copy'
+    ccCopy(copy, s.sessionId, s.cwd, 'Copy resume command')
+    row.append(kind, title, where, copy)
+    ccList.append(row)
+  }
+
   const tally = /** @type {HTMLElement} */ (el.querySelector('.tally'))
   if (!pr.hasHumanComments) {
     tally.append(chip('No human comments', 'c-muted'))
-    details.classList.add('no-findings')
+    if (!sessions.length) details.classList.add('no-findings')
   } else {
     tally.append(chip(`${pr.counts.total} comment${pr.counts.total === 1 ? '' : 's'}`, 'c-human'))
     if (pr.counts.fixed) tally.append(chip(`${pr.counts.fixed} fixed`, 'c-fixed'))
@@ -453,6 +526,7 @@ function paint() {
   $('jenkins-grant-needed').hidden = !(origin && state.jenkinsHasToken && !state.jenkinsGranted)
   $('jenkins-bad-token').hidden = !snap?.jenkinsBadToken
   $('claude-bad-key').hidden = snap?.claude?.state !== 'bad-key'
+  void paintClaudeCode()
   $('claude-grant-needed').hidden = snap?.claude?.state !== 'no-access'
   if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-token-link')).href = `${origin}/me/configure`
 
@@ -589,7 +663,7 @@ async function doRefresh() {
   btn.disabled = true
   btn.textContent = 'Refreshing…'
   try {
-    state.snapshot = await refresh({ jenkinsAllowed, claudeAllowed: jenkinsAllowed })
+    state.snapshot = await refresh({ jenkinsAllowed, claudeAllowed: jenkinsAllowed, localSessions })
     showError(null)
     paint()
   } catch (error) {
@@ -670,6 +744,28 @@ $('jenkins-setup').addEventListener('click', () => {
   $('toggle-settings').setAttribute('aria-expanded', 'true')
   input('jenkins-user').focus()
 })
+/** Settings line for the Claude Code helper: connected, not installed, or off. */
+async function paintClaudeCode() {
+  $('cc-install').textContent = `sh native/install.sh ${chrome.runtime.id}`
+  const status = $('cc-status')
+  const connect = /** @type {HTMLButtonElement} */ ($('cc-connect'))
+  if (!(await nativeAllowed())) {
+    status.textContent = 'Not connected.'
+    connect.hidden = false
+    return
+  }
+  connect.hidden = true
+  const cc = state.snapshot?.claudeCode
+  status.textContent = cc?.state === 'error' ? `Connected, but the helper didn't answer: ${cc.message}. Is it installed?` : cc?.state === 'ok' ? 'Connected — sessions are looked up on every refresh.' : 'Connected — sessions show after the next refresh.'
+}
+
+$('cc-connect').addEventListener('click', async () => {
+  // Synchronous inside the click: Chrome only shows the prompt for a user gesture.
+  const granted = await chrome.permissions.request({ permissions: ['nativeMessaging'] }).catch(() => false)
+  if (granted) await doRefresh()
+  await paintClaudeCode()
+})
+
 $('claude-key-clear').addEventListener('click', async () => {
   await saveSettings({ ...(await loadSettings()), claudeKey: '' })
   input('claude-key').placeholder = 'Anthropic API key, sk-ant-…'

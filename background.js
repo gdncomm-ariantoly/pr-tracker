@@ -8,14 +8,13 @@ import { addEvents } from './lib/inbox.js'
 import { diffSnapshots } from './lib/notify.js'
 import { badgeFor, refresh } from './lib/refresh.js'
 import { loadInbox, loadSettings, loadSnapshot, saveInbox } from './lib/store.js'
+import { hostAllowed, localSessions } from './platform.js'
 
 const ALARM = 'refresh'
 const APP = 'app' // notification-id prefix meaning "open the dashboard"
 const MAX_SEPARATE = 4 // beyond this, one summary notification instead of a flood
 /** Serialises inbox writes within this worker's lifetime (not state: nothing is lost if it restarts). */
 let inboxWrites = Promise.resolve()
-/** Has the user granted this optional host (Jenkins, Anthropic)? @param {string} origin */
-const allowed = (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] })
 
 chrome.action.onClicked.addListener(() => {
   void openApp()
@@ -30,7 +29,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) {
-    void refresh({ jenkinsAllowed: allowed, claudeAllowed: allowed }).catch(() => {})
+    void refresh({ jenkinsAllowed: hostAllowed, claudeAllowed: hostAllowed, localSessions }).catch(() => {})
   }
 })
 

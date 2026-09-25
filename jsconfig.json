@@ -11,5 +11,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["lib/**/*.js", "pages/**/*.js", "background.js", "tests/**/*.js", "tools/**/*.mjs"]
+  "include": ["lib/**/*.js", "pages/**/*.js", "background.js", "platform.js", "tests/**/*.js", "tools/**/*.mjs", "native/**/*.mjs"]
 }

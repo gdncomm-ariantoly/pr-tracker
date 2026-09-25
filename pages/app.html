@@ -68,6 +68,14 @@
         </span>
         <small class="muted">Claude then decides fixed / not fixed / no action for each comment and writes a one-line summary per PR. It's asked again only when a PR's comments, replies or commits change. Sends comment text, file paths and commit messages to Anthropic — check that's allowed for your repos. Billed to the key's account; set a spend limit on it. Stored only in this browser.</small>
       </label>
+      <div class="cc-setup">
+        <span class="label">Claude Code sessions <span class="muted">(optional)</span></span>
+        <span class="row">
+          <button type="button" id="cc-connect">Connect</button>
+          <span id="cc-status" class="muted"></span>
+        </span>
+        <small class="muted">Links each PR to the Claude Code sessions on this machine that reviewed or discussed it, with a copyable <code>claude --resume</code> command. Needs a small read-only helper that scans <code>~/.claude/projects</code>. Install it once from the pr-tracker folder:<br /><code id="cc-install"></code><br />Add <code>--hook</code> to also mark reviews you post with Claude Code (a hidden <code>&lt;!-- claude-code-session: … --&gt;</code> line), so teammates' PR Tracker can tell they came from Claude Code too.</small>
+      </div>
       <label class="check">
         <input type="checkbox" id="notify" />
         Desktop notifications for updates
@@ -138,6 +146,10 @@
             </div>
             <div class="tally"></div>
           </summary>
+          <section class="cc-sessions" hidden>
+            <h4>Claude Code sessions on this machine</h4>
+            <ul></ul>
+          </section>
           <ol class="findings"></ol>
         </details>
       </article>
@@ -150,6 +162,7 @@
           <span class="avatar"></span>
           <strong class="who"></strong>
           <span class="action muted"></span>
+          <button type="button" class="cc" hidden>Claude Code</button>
           <code class="where"></code>
           <span class="spacer"></span>
           <span class="status"></span>
