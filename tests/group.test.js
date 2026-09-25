@@ -53,3 +53,18 @@ it('puts prod-* and nonprod-* deployment repos after every service, however urge
   ], NOW)
   assert.deepEqual(services.map((g) => g.name), ['seo-backend', 'nonprod-seo-backend', 'prod-seo-backend'])
 })
+
+it('PRs I am on come before watched-only ones, in a service and across services', () => {
+  const w = (/** @type {string} */ id, /** @type {string} */ repo, /** @type {[number, number]} */ c) => ({ ...pr(id, repo, '2026-09-24T11:00:00Z', c), watched: true })
+  const { services } = groupPRs([
+    w('watched-unfixed', 'o/svc', [3, 3]),
+    pr('mine-quiet', 'o/svc', '2026-09-20T10:00:00Z'),
+    w('other-watched', 'o/other', [5, 5]),
+    pr('requested', 'o/third', '2026-09-19T10:00:00Z'),
+  ], NOW)
+  assert.deepEqual(services.map((g) => [g.name, g.prs.map((p) => p.id)]), [
+    ['svc', ['mine-quiet', 'watched-unfixed']],
+    ['third', ['requested']],
+    ['other', ['other-watched']],
+  ])
+})
