@@ -5,7 +5,7 @@ import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { judgeOnePR, refresh } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
-import { CLAUDE_ORIGIN } from '../lib/claude.js'
+import { CLAUDE_ORIGIN, keyProblem } from '../lib/claude.js'
 import { resumeCommand } from '../lib/sessions.js'
 import { localSessions, nativeAllowed } from '../platform.js'
 import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
@@ -492,9 +492,11 @@ function renderPR(pr, viewer, showRepo) {
     if (pr.counts.pending) tally.append(chip(`${pr.counts.pending} unfixed`, 'c-pending'))
     if (pr.counts.noAction) tally.append(chip(`${pr.counts.noAction} no action`, 'c-muted'))
     const list = /** @type {HTMLElement} */ (el.querySelector('.findings'))
-    // Unfixed first — those are what need doing — then no-action, then fixed.
+    // Unfixed first — those are what need doing — then no-action, then fixed;
+    // within each, my own comments first.
     const rank = (/** @type {Finding} */ f) => (f.fixed ? 2 : f.noAction ? 1 : 0)
-    const ordered = [...pr.findings].sort((a, b) => rank(a) - rank(b))
+    const own = (/** @type {Finding} */ f) => (f.author === viewer ? 0 : 1)
+    const ordered = [...pr.findings].sort((a, b) => rank(a) - rank(b) || own(a) - own(b))
     const groups = ['Needs attention', 'No action needed', 'Fixed']
     let current = -1
     for (const f of ordered) {
@@ -559,7 +561,7 @@ function paint() {
     return
   }
   const prs = /** @type {ReviewPR[]} */ (snap[state.tab]).filter(shown).filter((p) => !state.onlyPending || p.counts.pending > 0)
-  const { services, stale } = groupPRs(prs)
+  const { services, stale } = groupPRs(prs, Date.now(), snap?.viewer ?? '')
   for (const group of services) {
     const section = document.createElement('section')
     section.className = 'group'
@@ -709,6 +711,12 @@ $('settings').addEventListener('submit', async (event) => {
   const typedJenkins = input('jenkins-token').value.trim()
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)
   const typedClaude = input('claude-key').value.trim()
+  const badKey = typedClaude && keyProblem(typedClaude)
+  if (badKey) {
+    showError(badKey)
+    input('claude-key').focus()
+    return
+  }
   // One prompt for everything newly needed: Chrome allows a single request per click.
   const origins = [
     ...(typedJenkins && origin && !state.jenkinsGranted ? [`${origin}/*`] : []),

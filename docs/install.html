@@ -141,22 +141,22 @@
 
 <div class="wrap">
   <header>
-    <span class="eyebrow">Internal Chrome extension · v0.2.0</span>
+    <span class="eyebrow">Internal Chrome extension · v0.3.0</span>
     <h1>PR Tracker</h1>
     <p class="lede">One tab with your open pull requests and the ones waiting on your review, plus every comment from a real person (bots left out) and whether it's been fixed. You get a desktop alert when something changes.</p>
     <div class="actions">
-      <a class="btn" href="pr-tracker-0.2.0.zip" target="_blank" rel="noopener">
+      <a class="btn" href="pr-tracker-0.3.0.zip" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-        Download pr-tracker-0.2.0.zip
+        Download pr-tracker-0.3.0.zip
       </a>
-      <span class="meta">54 KB · Chrome 116+ · github.com only</span>
+      <span class="meta">78 KB · Chrome 116+ · github.com (+ optional Jenkins, Claude)</span>
     </div>
     <p class="muted" style="font-size:.9rem">The zip sits next to this page. To share, send the whole folder (this page, <code>screenshot.png</code> and the zip) over Teams or a shared drive.</p>
   </header>
 
   <figure>
-    <img src="screenshot.png" alt="PR Tracker dashboard: a PR card expanded to show four comments, each tagged Replied, Not addressed, Fixed (reply) or Resolved, with the reason under each.">
-    <figcaption>Dashboard with sample data. Unfixed comments are listed first, and each one says why it got its status.</figcaption>
+    <img src="screenshot.png" alt="PR Tracker dashboard: PR cards grouped by service, one expanded to show its comments as cards grouped into Needs attention and Fixed, with the Updates panel on the right.">
+    <figcaption>Dashboard with sample data. Comments that still need attention come first, each says why it got its status, and updates collect in the panel on the right.</figcaption>
   </figure>
 
   <section aria-labelledby="what">
@@ -165,12 +165,15 @@
       <div class="fact">
         <h3>To review</h3>
         <p>PRs where your review is requested (the toolbar badge counts these), plus open PRs you've already reviewed, so you can see whether your comments were acted on.</p>
+        <p>Add <strong>watched repositories</strong> in Settings to also see every open PR in those repos, even when nobody added you as a reviewer. They're labelled <em>Watched repo</em>, sorted after PRs you're on, and can be hidden with one checkbox.</p>
+        <p>PRs carrying <strong>your own comments</strong> come first, those with your unfixed comments at the very top, and your comments lead each PR's list.</p>
       </div>
       <div class="fact">
         <h3>My PRs</h3>
         <p>Your open PRs. Each one either says "No human comments" or shows how many comments are fixed and how many aren't.</p>
-        <p>Each PR shows its latest <strong>Jenkins build</strong> (passed, failed, running) and links to it. Deployment repos (<code>prod-*</code>, <code>nonprod-*</code>) link to their prod or non-prod Jenkins instead.</p>
-        <p>Both tabs are grouped by service, with PRs that have unfixed comments first, then PRs with other comments, then the rest, newest first. PRs with no activity for over a week collapse into a <strong>Stale</strong> group at the bottom.</p>
+        <p>Each card says who has <strong>approved</strong>, who asked for <strong>changes</strong>, and whose review you're still <strong>waiting on</strong>, people and teams by name.</p>
+        <p>Each PR shows its latest <strong>Jenkins build</strong> (passed, failed, running) and links to it, in whichever team folder holds the repo (TRFCEE, SEO, …). Deployment repos (<code>prod-*</code>, <code>nonprod-*</code>) link to their prod or non-prod Jenkins instead; test-automation repos (<code>cucumber-*</code>) show no Jenkins at all.</p>
+        <p>Both tabs are grouped by service, with PRs that have unfixed comments first, then PRs with other comments, then the rest, newest first; deployment repos come last. PRs with no activity for over a week collapse into a <strong>Stale</strong> group at the bottom.</p>
       </div>
       <div class="fact">
         <h3>Per comment</h3>
@@ -242,6 +245,28 @@
     </div>
   </section>
 
+  <section aria-labelledby="extras">
+    <h2 id="extras">Optional extras</h2>
+    <p class="muted">Everything above works without these. Each is set up in Settings and stays in this browser.</p>
+    <div class="facts">
+      <div class="fact">
+        <h3>Jenkins pass/fail</h3>
+        <p>GitHub hides Jenkins builds from fine-grained tokens. Add your <strong>Jenkins user ID and API token</strong> (Jenkins → your name → Security / Configure → API Token → <em>Add new token</em>) and accept Chrome's prompt for Jenkins access. PR Tracker then reads each PR's last build, read-only.</p>
+      </div>
+      <div class="fact">
+        <h3>Claude summaries</h3>
+        <p>Paste an <strong>Anthropic API key</strong> (console.anthropic.com → API keys, <code>sk-ant-api…</code>; a Claude.ai subscription can't be used). Click <strong>Summarize with Claude</strong> on a PR and Claude judges each comment fixed / not fixed / no action and writes one line on what still blocks it. It's asked only when you click, unless you tick <em>Ask automatically</em>, and answers are reused until the PR changes. Default model Sonnet 5.</p>
+        <p class="muted">This sends comment text, file paths and commit messages to Anthropic, billed to the key's account. Check that's allowed, and set a spend limit on the key.</p>
+      </div>
+      <div class="fact">
+        <h3>Claude Code sessions</h3>
+        <p>Links each PR to the Claude Code sessions on your Mac that reviewed or discussed it, with a copyable <code>claude --resume</code> command. Needs a small read-only helper. From the unzipped folder, run the command shown in Settings:</p>
+        <p><code>sh native/install.sh &lt;extension-id&gt; --hook</code></p>
+        <p>then Settings → Claude Code sessions → <strong>Connect</strong>. <code>--hook</code> also marks reviews you post with Claude Code so teammates can see where they came from. Needs Node.js; <code>--uninstall</code> removes it.</p>
+      </div>
+    </div>
+  </section>
+
   <section aria-labelledby="notify">
     <h2 id="notify">Notifications</h2>
     <p>Each refresh (every 15 minutes by default, or when you click Refresh) is compared with the previous one. You get a desktop alert for:</p>
@@ -306,6 +331,14 @@
         <div><p>Either the PR's latest commit hasn't reported a build to GitHub yet, or GitHub is hiding builds from your token. Make sure the token has <strong>Commit statuses: Read-only</strong> (edit it, no new token needed) and click Refresh. If builds are still hidden, GitHub doesn't show Jenkins check runs to fine-grained tokens. To see pass/fail, add a <strong>Jenkins API token</strong> in Settings (the blue banner has a button for it): in Jenkins click your name (top right) → Security or Configure → API Token → <em>Add new token</em>, then paste it with your Jenkins user ID and accept Chrome's prompt for Jenkins access.</p></div>
       </details>
       <details>
+        <summary>"GitHub API error 504" or "Couldn't load … this time"</summary>
+        <div><p>GitHub took too long. Each list is fetched separately and retried twice, so usually only one list is missing for a moment; the rest still show. Click Refresh to try again.</p></div>
+      </details>
+      <details>
+        <summary>"Waiting on a team" without the team's name</summary>
+        <div><p>GitHub hides which team from fine-grained tokens without organization access. Adding <strong>Organization permissions → Members: Read-only</strong> to the token should reveal it.</p></div>
+      </details>
+      <details>
         <summary>A bot account shows up as a person</summary>
         <div><p>Some CI accounts are regular user accounts. Add their logins under <strong>Extra bot logins</strong> in Settings.</p></div>
       </details>
@@ -321,12 +354,14 @@
           <tr><td><code>storage</code></td><td>Your token, settings and the last fetched list</td></tr>
           <tr><td><code>alarms</code></td><td>Refreshing in the background</td></tr>
           <tr><td><code>notifications</code></td><td>Desktop alerts for updates</td></tr>
-          <tr><td><code>api.github.com</code></td><td>The one read-only GraphQL query that fetches your PRs</td></tr>
-          <tr><td><code>*.gdn-app.com</code> (optional)</td><td>Only once you add a Jenkins API token: reads each PR's last Jenkins build with it</td></tr>
+          <tr><td><code>api.github.com</code></td><td>Read-only GraphQL queries that fetch your PRs</td></tr>
+          <tr><td><code>*.gdn-app.com</code> (optional)</td><td>Only once you add a Jenkins API token: lists team folders and reads each PR's last Jenkins build with it</td></tr>
+          <tr><td><code>api.anthropic.com</code> (optional)</td><td>Only once you add an Anthropic API key: asks Claude to judge comments and summarise a PR</td></tr>
+          <tr><td><code>nativeMessaging</code> (optional)</td><td>Only after Connect: talks to the local Claude Code helper, which reads session metadata from <code>~/.claude/projects</code></td></tr>
         </tbody>
       </table>
     </div>
-    <p class="muted">It can't see your tabs, browsing history, or any other website. It never triggers or changes Jenkins builds.</p>
+    <p class="muted">It can't see your tabs, browsing history, or any other website. It never triggers or changes Jenkins builds, and never comments, approves or pushes on GitHub.</p>
   </section>
 
   <footer>

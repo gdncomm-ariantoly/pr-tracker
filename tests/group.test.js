@@ -68,3 +68,15 @@ it('PRs I am on come before watched-only ones, in a service and across services'
     ['other', ['other-watched']],
   ])
 })
+
+it('PRs carrying my comments come first: my unfixed ones, then my others, then the rest', () => {
+  const f = (/** @type {string} */ author, fixed = false) => ({ author, fixed, noAction: false })
+  const { services } = groupPRs([
+    { ...pr('others-unfixed', 'o/svc', '2026-09-24T11:00:00Z', [1, 1]), findings: [f('bob')] },
+    { ...pr('mine-fixed', 'o/svc', '2026-09-20T00:00:00Z', [1, 0]), findings: [f('me', true)] },
+    { ...pr('mine-unfixed', 'o/svc', '2026-09-19T00:00:00Z', [2, 1]), findings: [f('bob', true), f('me')] },
+  ], NOW, 'me')
+  assert.deepEqual(services[0].prs.map((p) => p.id), ['mine-unfixed', 'mine-fixed', 'others-unfixed'])
+  const unsorted = groupPRs(services[0].prs, NOW)
+  assert.equal(unsorted.services[0].prs[0].id, 'others-unfixed', 'without a viewer, the old order')
+})

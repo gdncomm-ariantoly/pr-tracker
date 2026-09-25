@@ -185,3 +185,13 @@ describe('addClaudeJudgements', () => {
     assert.equal(changed.mine[0].aiStale, true, 'kept, but marked outdated')
   })
 })
+
+describe('keyProblem', () => {
+  it('catches sign-in tokens and non-keys before Anthropic does', async () => {
+    const { keyProblem } = await import('../lib/claude.js')
+    assert.match(keyProblem('sk-ant-oat01-abc') ?? '', /sign-in token/)
+    assert.match(keyProblem('sk-ant-admin01-abc') ?? '', /Admin key/)
+    assert.match(keyProblem('eyJhbGciOi') ?? '', /doesn't look like/)
+    assert.equal(keyProblem('sk-ant-api03-abc'), null)
+  })
+})
