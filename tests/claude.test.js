@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { applyJudgement, describePR, judgePR, parseJudgement, requestBody, signature } from '../lib/claude.js'
-import { addClaudeJudgements } from '../lib/refresh.js'
+import { addClaudeJudgements, judgeOnePR } from '../lib/refresh.js'
 import { applyOverrides } from '../lib/overrides.js'
 
 /** @param {Partial<import('../lib/analyze.js').Finding>} over @returns {import('../lib/analyze.js').Finding} */
@@ -45,6 +45,10 @@ describe('requestBody', () => {
     assert.equal(opus.output_config.format.type, 'json_schema')
     assert.equal(opus.output_config.effort, 'low')
     assert.equal(opus.fallbacks, 'default')
+    const opus55 = /** @type {any} */ (requestBody('claude-opus-5-5', 'p'))
+    assert.equal(opus55.output_config.effort, 'low', 'Opus 5.5 would default to medium')
+    assert.equal(opus55.fallbacks, undefined)
+    assert.equal(opus55.thinking, undefined, 'thinking left alone: Opus 5.5 rejects disabling it')
     const haiku = /** @type {any} */ (requestBody('claude-haiku-4-5', 'p'))
     assert.equal(haiku.output_config.effort, undefined)
     assert.equal(haiku.fallbacks, undefined)
@@ -151,5 +155,33 @@ describe('addClaudeJudgements', () => {
     await addClaudeJudgements(bad, auth, { area: memory(), claudeFetch: reply({}, 401), claudeAllowed: async () => true })
     assert.equal(bad.claude.state, 'bad-key')
     assert.equal(bad.mine[0].findings[0].status, 'open', "the rules' guess stays")
+  })
+
+  it('manual mode: never calls, reuses answers, flags them outdated when the PR changed', async () => {
+    let calls = 0
+    const f = /** @type {typeof fetch} */ (async () => (calls++, new Response(JSON.stringify(answer({ summary: 'S', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] })))))
+    const area = memory()
+    const deps = { area, claudeFetch: f, claudeAllowed: async () => true }
+    const fresh = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
+    await addClaudeJudgements(fresh, auth, deps, false)
+    assert.equal(calls, 0)
+    assert.equal(fresh.mine[0].aiSummary, undefined)
+
+    // The card's Summarize button asks for that one PR.
+    await area.set({ snapshot: fresh, settings: { claudeKey: 'k', claudeModel: 'claude-opus-5' } })
+    assert.equal(await judgeOnePR('P1', deps), 'ok')
+    assert.equal(calls, 1)
+    const saved = /** @type {any} */ (area.data.snapshot)
+    assert.equal(saved.mine[0].aiSummary, 'S')
+    assert.equal(saved.mine[0].findings[0].status, 'ai-fixed')
+
+    const same = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
+    await addClaudeJudgements(same, auth, deps, false)
+    assert.equal(same.mine[0].aiSummary, 'S', 'the answer is reused on the next refresh')
+    assert.equal(same.mine[0].aiStale, undefined)
+    const changed = /** @type {any} */ ({ mine: [pr({ commits: [] })], toReview: [] })
+    await addClaudeJudgements(changed, auth, deps, false)
+    assert.equal(calls, 1)
+    assert.equal(changed.mine[0].aiStale, true, 'kept, but marked outdated')
   })
 })

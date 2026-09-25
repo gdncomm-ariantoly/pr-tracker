@@ -2,7 +2,7 @@ import { groupPRs, STALE_DAYS } from '../lib/group.js'
 import { renderComment } from './markdown.js'
 import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
-import { refresh } from '../lib/refresh.js'
+import { judgeOnePR, refresh } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { CLAUDE_ORIGIN } from '../lib/claude.js'
@@ -49,6 +49,7 @@ const state = {
   jenkinsHidden: false,
   jenkinsGranted: false,
   jenkinsHasToken: false,
+  claudeReady: false,
   /** @type {import('../lib/inbox.js').InboxItem[]} */ inbox: [],
   /** Folded comments (fixed / no action needed) the user opened. */
   /** @type {Set<string>} */ unfolded: new Set(),
@@ -410,8 +411,25 @@ function renderPR(pr, viewer, showRepo) {
     approvals.hidden = !approvals.childElementCount
   }
   const summary = /** @type {HTMLElement} */ (el.querySelector('.ai-summary'))
-  summary.hidden = !pr.aiSummary
-  setText(el, '.ai-summary-text', pr.aiSummary ?? '')
+  const canAsk = state.claudeReady && pr.hasHumanComments
+  summary.hidden = !pr.aiSummary && !canAsk
+  setText(el, '.ai-summary-text', pr.aiSummary ? `${pr.aiSummary}${pr.aiStale ? ' (outdated: the PR changed since)' : ''}` : '')
+  const mark = /** @type {HTMLElement} */ (el.querySelector('.ai-mark'))
+  mark.hidden = !pr.aiSummary
+  const ask = /** @type {HTMLButtonElement} */ (el.querySelector('.ai-ask'))
+  ask.hidden = !canAsk || (!!pr.aiSummary && !pr.aiStale)
+  ask.textContent = pr.aiSummary ? 'Summarize again' : 'Summarize with Claude'
+  ask.addEventListener('click', async (event) => {
+    event.preventDefault() // inside <summary>: don't toggle the card
+    event.stopPropagation()
+    ask.disabled = true
+    ask.textContent = 'Asking Claude…'
+    const result = await judgeOnePR(pr.id, { claudeAllowed: jenkinsAllowed })
+    if (result !== 'ok') {
+      ask.disabled = false
+      ask.textContent = { 'bad-key': 'Key rejected', refused: 'Claude declined', 'no-access': 'Allow access first', error: 'Failed — retry', 'no-key': 'No key', gone: 'PR gone' }[result] ?? 'Failed'
+    } // on success the stored snapshot changes and the page repaints
+  })
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
   const deploy = deployJenkinsLink(pr)
@@ -712,9 +730,11 @@ $('settings').addEventListener('submit', async (event) => {
     jenkinsToken: typedJenkins || current.jenkinsToken,
     claudeKey: typedClaude || current.claudeKey,
     claudeModel: /** @type {HTMLSelectElement} */ ($('claude-model')).value,
+    claudeAuto: input('claude-auto').checked,
   })
   if (asking && (await asking) && origin) state.jenkinsGranted = await jenkinsAllowed(origin)
   input('claude-key').value = ''
+  state.claudeReady = !!(typedClaude || current.claudeKey)
   if (typedClaude || current.claudeKey) input('claude-key').placeholder = 'Key saved — paste a new one to replace it'
   state.jenkinsHasToken = !!(typedJenkins || current.jenkinsToken)
   input('token').value = ''
@@ -769,6 +789,7 @@ $('cc-connect').addEventListener('click', async () => {
 
 $('claude-key-clear').addEventListener('click', async () => {
   await saveSettings({ ...(await loadSettings()), claudeKey: '' })
+  state.claudeReady = false
   input('claude-key').placeholder = 'Anthropic API key, sk-ant-…'
   await doRefresh()
 })
@@ -850,6 +871,8 @@ async function init() {
   input('jenkins-user').value = settings.jenkinsUser
   const model = /** @type {HTMLSelectElement} */ ($('claude-model'))
   model.value = settings.claudeModel
+  input('claude-auto').checked = settings.claudeAuto
+  state.claudeReady = !!settings.claudeKey
   if (settings.claudeKey) input('claude-key').placeholder = 'Key saved — paste a new one to replace it'
   if (settings.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)
