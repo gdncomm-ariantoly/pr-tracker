@@ -284,6 +284,7 @@ a.chip.build:hover { text-decoration: underline; }
 .inbox-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .inbox-head h2 { font-size: 14px; margin: 0; }
 .inbox-head button { font-size: 12px; padding: 2px 8px; }
+.inbox-head button.armed { color: var(--bad-fg); border-color: var(--bad-fg); background: var(--bad-bg); }
 .inbox-head .icon { display: none; font-size: 18px; line-height: 1; padding: 0 8px; }
 .inbox-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; overflow-x: hidden; }
 .inbox-list li { border-bottom: 1px solid var(--line); position: relative; }

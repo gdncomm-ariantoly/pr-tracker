@@ -83,7 +83,7 @@ Each tab is grouped by service (the repository name without `gdncomm/`). Order i
 
 ### Updates panel
 
-Every detected update (below) is also kept in an **Updates** panel on the right: newest first, unread marked with a dot and counted in the header, last 100 kept. Clicking one opens it on GitHub and marks it read; the **✓** on hover marks it read without opening it; *Mark all read* clears the count. Each update is tagged **My PR** or **To review** (desktop notifications say the same in their context line), and the **×** on hover deletes it. On windows narrower than 1100px the panel becomes a drawer behind the header's **Updates** button. The panel records updates even when desktop notifications are off.
+Every detected update (below) is also kept in an **Updates** panel on the right: newest first, unread marked with a dot and counted in the header, last 100 kept. Clicking one opens it on GitHub and marks it read; the **✓** on hover marks it read without opening it; *Mark all read* clears the count; *Clear all* (click twice: the first click asks *Delete n?*) deletes every update and any desktop notifications still on screen. Each update is tagged **My PR** or **To review** (desktop notifications say the same in their context line), and the **×** on hover deletes it. On windows narrower than 1100px the panel becomes a drawer behind the header's **Updates** button. The panel records updates even when desktop notifications are off.
 
 ### Notifications
 

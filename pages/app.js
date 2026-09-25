@@ -707,6 +707,18 @@ function paintInbox() {
   badge.textContent = String(unread)
   const readAll = /** @type {HTMLButtonElement} */ ($('inbox-read-all'))
   readAll.disabled = unread === 0
+  const clear = /** @type {HTMLButtonElement} */ ($('inbox-clear'))
+  clear.disabled = state.inbox.length === 0
+  if (!state.inbox.length) disarmClear()
+}
+
+/** Clear all asks once more before deleting: the first click only arms it. */
+let clearTimer = 0
+function disarmClear() {
+  clearTimeout(clearTimer)
+  const clear = $('inbox-clear')
+  clear.classList.remove('armed')
+  clear.textContent = 'Clear all'
 }
 
 /** @param {boolean} open */
@@ -723,6 +735,23 @@ $('inbox-read-all').addEventListener('click', async () => {
   state.inbox = markRead(state.inbox)
   paintInbox()
   await saveInbox(state.inbox)
+})
+
+$('inbox-clear').addEventListener('click', async () => {
+  const clear = $('inbox-clear')
+  if (!clear.classList.contains('armed')) {
+    clear.classList.add('armed')
+    clear.textContent = `Delete ${state.inbox.length}?`
+    clearTimer = window.setTimeout(disarmClear, 4000)
+    return
+  }
+  disarmClear()
+  state.inbox = []
+  paintInbox()
+  await saveInbox(state.inbox)
+  // Desktop notifications still on screen go too.
+  const shown = await chrome.notifications.getAll().catch(() => ({}))
+  await Promise.all(Object.keys(shown).map((id) => chrome.notifications.clear(id)))
 })
 
 async function doRefresh() {

@@ -448,6 +448,15 @@ async function verify(context, id) {
   check('a merged PR leaves the list, with a note', (await page.locator('article.pr').count()) === mineCount - 1 && ((await page.textContent('#warning')) ?? '').includes('was merged'), (await page.textContent('#warning')) ?? '')
   singleOverride = {}
   singleState = 'OPEN'
+
+  // Clear all: one click arms it, a second deletes every update.
+  const listed = await page.locator('#inbox-list li').count()
+  await page.click('#inbox-clear')
+  check('the first click on Clear all only asks', (await page.locator('#inbox-list li').count()) === listed && ((await page.textContent('#inbox-clear')) ?? '') === `Delete ${listed}?`, (await page.textContent('#inbox-clear')) ?? '')
+  await page.click('#inbox-clear')
+  await page.waitForFunction(() => document.querySelectorAll('#inbox-list li').length === 0, null, { timeout: 5000 }).catch(() => {})
+  const storedInbox = await page.evaluate(async () => /** @type {unknown[]} */ ((await chrome.storage.local.get('inbox')).inbox).length)
+  check('the second clears every update, for good', listed > 0 && (await page.locator('#inbox-list li').count()) === 0 && storedInbox === 0 && (await page.isVisible('#inbox-empty')) && (await page.isDisabled('#inbox-clear')), `${listed} listed, ${storedInbox} stored`)
   await page.setViewportSize({ width: 900, height: 900 })
   check('narrow window: panel hidden behind an Updates button', (await page.isHidden('#inbox')) && (await page.isVisible('#toggle-inbox')))
   await page.click('#toggle-inbox')
