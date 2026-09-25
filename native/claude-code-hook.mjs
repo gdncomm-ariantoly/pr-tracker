@@ -43,7 +43,8 @@ export function markCommand(command, id) {
 
 /** @param {any} input  the hook's stdin JSON */
 export function hookOutput(input) {
-  const id = typeof input?.session_id === 'string' ? input.session_id : ''
+  // Only a UUID goes into a shell command, whatever the hook is handed.
+  const id = typeof input?.session_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.session_id) ? input.session_id : ''
   const tool = String(input?.tool_name ?? '')
   const args = input?.tool_input
   if (!id || !args || typeof args !== 'object') return null

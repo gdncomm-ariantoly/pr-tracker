@@ -96,11 +96,17 @@ describe('jenkinsBuild', () => {
     assert.equal(jenkinsBuild(withChecks([run({ conclusion: 'TIMED_OUT' })]))?.state, 'failure')
   })
   it('reads a Jenkins commit status too, and the worst Jenkins job wins', () => {
-    const status = { __typename: 'StatusContext', context: 'continuous-integration/jenkins/pr-merge', state: 'FAILURE', targetUrl: 'https://ci/job/x/PR-1/9/display/redirect' }
+    const status = { __typename: 'StatusContext', context: 'continuous-integration/jenkins/pr-merge', state: 'FAILURE', targetUrl: 'https://jenkins-build-ci-2.gdn-app.com/job/x/PR-1/9/display/redirect' }
     assert.deepEqual(jenkinsBuild(withChecks([run({}), status])), { state: 'failure', name: 'continuous-integration/jenkins/pr-merge', number: 9, url: status.targetUrl, at: null })
   })
   it('ignores non-Jenkins checks and missing data', () => {
     assert.equal(jenkinsBuild(withChecks([run({ name: 'SonarCloud', detailsUrl: 'https://sonarcloud.io/x' })])), null)
+    // Anyone who can post a commit status could name it "Jenkins": only https links on our Jenkins count.
+    assert.equal(jenkinsBuild(withChecks([run({ detailsUrl: 'https://evil.example/jenkins/PR-1/3' })])), null)
+    assert.equal(jenkinsBuild(withChecks([run({ detailsUrl: 'http://jenkins-build-ci-2.gdn-app.com/job/x/3' })])), null)
+    assert.equal(jenkinsBuild(withChecks([run({ detailsUrl: 'https://gdn-app.com.evil.example/job/x/3' })])), null)
+    assert.equal(jenkinsBuild(withChecks([run({ detailsUrl: 'javascript:alert(1)//jenkins' })])), null)
+    assert.equal(jenkinsBuild(withChecks([run({ detailsUrl: null })])), null)
     assert.equal(jenkinsBuild(pr({})), null)
     assert.equal(jenkinsBuild(pr({ head: { nodes: [null, { commit: { statusCheckRollup: null } }] } })), null)
   })

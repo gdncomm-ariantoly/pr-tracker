@@ -4,6 +4,8 @@
  * GitHub already sanitizes it, but this page never trusts remote HTML: it is
  * parsed inert (DOMParser, no scripts run, nothing loads), then rebuilt from an
  * allowlist of tags and attributes. Anything else is dropped — its text kept.
+ * Classes are kept only for GitHub's own formatting (syntax highlighting,
+ * diffs, task lists), so a comment can't borrow this page's banners or buttons.
  */
 
 const TAGS = new Set([
@@ -15,6 +17,7 @@ const TAGS = new Set([
 const DROP = new Set(['script', 'style', 'iframe', 'object', 'embed', 'form', 'button', 'textarea', 'select', 'svg', 'math', 'template', 'noscript', 'link', 'meta'])
 const ATTRS = new Set(['href', 'src', 'srcset', 'alt', 'title', 'class', 'colspan', 'rowspan', 'align', 'width', 'height', 'open', 'checked', 'disabled', 'type', 'start', 'lang', 'alias', 'fallback-src'])
 const GITHUB = 'https://github.com/'
+const CLASS = /^(?:pl-[a-z0-9]+|blob-(?:code|num)(?:-[a-z]+)*|contains-task-list|task-list-item(?:-checkbox)?)$/
 
 /** @param {string} value @param {'href' | 'src'} kind */
 function safeUrl(value, kind) {
@@ -55,6 +58,9 @@ function clean(node, doc) {
     } else if (attr === 'srcset') {
       const parts = value.split(',').map((p) => p.trim().split(/\s+/)).map(([u, d]) => [safeUrl(u, 'src'), d]).filter(([u]) => u)
       if (parts.length) out.setAttribute('srcset', parts.map((p) => p.join(' ')).join(', '))
+    } else if (attr === 'class') {
+      const kept = value.split(/\s+/).filter((c) => CLASS.test(c))
+      if (kept.length) out.setAttribute('class', kept.join(' '))
     } else {
       out.setAttribute(attr, value)
     }

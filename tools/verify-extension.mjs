@@ -298,6 +298,8 @@ async function verify(context, id) {
     check('comments render GitHub formatting (code, tables)', (await page.locator('.markdown-body code').count()) > 0)
     const pwned = await page.evaluate(() => /** @type {any} */ (window).__pwned ?? null)
     check('no script, event handler or javascript: link survives', pwned === null && (await page.locator('.markdown-body script, .markdown-body [onerror], .markdown-body a[href^="javascript:"]').count()) === 0, String(pwned))
+    const styled = await page.locator('.markdown-body span', { hasText: 'styled' }).first().getAttribute('class')
+    check("a comment keeps GitHub's formatting classes only, never the page's own", styled === 'pl-k', String(styled))
     check('relative GitHub links point at github.com and open in a new tab', (await page.locator('.markdown-body a', { hasText: 'relative' }).first().getAttribute('href')) === 'https://github.com/gdncomm/api/pull/1')
   }
   if (await page.locator('.conversation li').count()) {

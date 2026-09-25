@@ -46,7 +46,7 @@ zip -q -r "$out" . \
   -x 'tools/*' \
   -x 'docs/*' 'dist/*' \
   -x 'package.json' 'package-lock.json' 'jsconfig.json' 'tsconfig.json' \
-  -x 'README.md' '*.zip' '*.map'
+  -x 'README.md' 'CLAUDE.md' 'AGENTS.md' '*.zip' '*.map'
 
 echo "$out"
 unzip -l "$out" | tail -1

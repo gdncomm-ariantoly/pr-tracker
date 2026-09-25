@@ -120,7 +120,7 @@
                       "body": "Could this be null when the key is missing?",
                       "createdAt": "2026-09-20T05:05:00Z",
                       "url": "https://github.com/acme/api/pull/1#c7",
-                      "bodyHTML": "<p>Could this be null when the key is missing?</p><img src=\"x\" onerror=\"window.__pwned=1\"><a href=\"javascript:window.__pwned=2\">click</a><script>window.__pwned=3</script><a href=\"/gdncomm/api/pull/1\">relative</a>"
+                      "bodyHTML": "<p>Could this be null when the key is missing?</p><img src=\"x\" onerror=\"window.__pwned=1\"><a href=\"javascript:window.__pwned=2\">click</a><script>window.__pwned=3</script><a href=\"/gdncomm/api/pull/1\">relative</a><span class=\"banner error pl-k\">styled</span>"
                     },
                     {
                       "id": "C8",
@@ -173,7 +173,7 @@
                           "name": "Jenkins CI",
                           "status": "COMPLETED",
                           "conclusion": "SUCCESS",
-                          "detailsUrl": "https://jenkins.example.com/job/acme/job/api/job/PR-101/3",
+                          "detailsUrl": "https://jenkins-build-ci-2.gdn-app.com/job/acme/job/api/job/PR-101/3",
                           "startedAt": "2026-09-21T03:00:00Z",
                           "completedAt": "2026-09-21T03:12:00Z"
                         }
@@ -316,7 +316,7 @@
                           "name": "Jenkins CI",
                           "status": "COMPLETED",
                           "conclusion": "FAILURE",
-                          "detailsUrl": "https://jenkins.example.com/job/acme/job/api/job/PR-103/7",
+                          "detailsUrl": "https://jenkins-build-ci-2.gdn-app.com/job/acme/job/api/job/PR-103/7",
                           "startedAt": "2026-09-23T01:00:00Z",
                           "completedAt": "2026-09-23T01:09:00Z"
                         },

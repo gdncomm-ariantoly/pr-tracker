@@ -17,7 +17,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { accessSync, constants, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { accessSync, chmodSync, constants, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -123,8 +123,10 @@ export function handle(request, root = ROOT, cacheFile = CACHE) {
   }
   const index = indexAll(root, cache)
   try {
-    mkdirSync(path.dirname(cacheFile), { recursive: true })
-    writeFileSync(cacheFile, JSON.stringify(index))
+    // Private to this user: session titles and project paths can be sensitive.
+    mkdirSync(path.dirname(cacheFile), { recursive: true, mode: 0o700 })
+    writeFileSync(cacheFile, JSON.stringify(index), { mode: 0o600 })
+    chmodSync(cacheFile, 0o600) // an older cache was created world-readable
   } catch {
     // a read-only home still answers, just slower next time
   }
