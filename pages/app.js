@@ -775,10 +775,33 @@ async function doRefresh() {
 
 $('refresh').addEventListener('click', () => void doRefresh())
 
-$('toggle-settings').addEventListener('click', () => {
-  const form = $('settings')
-  form.hidden = !form.hidden
-  $('toggle-settings').setAttribute('aria-expanded', String(!form.hidden))
+const settingsDialog = /** @type {HTMLDialogElement} */ ($('settings-dialog'))
+
+/** Open Settings as a pop-up. @param {string} [focus]  id of the field to start in */
+function openSettings(focus) {
+  showSettingsError(null)
+  if (!settingsDialog.open) settingsDialog.showModal()
+  $('toggle-settings').setAttribute('aria-expanded', 'true')
+  if (focus) input(focus).focus()
+}
+
+/** A problem saving, shown inside the pop-up where it can be seen. @param {string | null} message */
+function showSettingsError(message) {
+  const el = $('settings-error')
+  el.hidden = !message
+  el.textContent = message ?? ''
+}
+
+$('toggle-settings').addEventListener('click', () => openSettings())
+$('settings-close').addEventListener('click', () => settingsDialog.close())
+settingsDialog.addEventListener('close', () => $('toggle-settings').setAttribute('aria-expanded', 'false'))
+// A click on the dimmed backdrop closes it; the form fills the dialog, so only
+// the backdrop targets the dialog itself. Both ends must be outside, so a text
+// selection dragged out of a field doesn't close it.
+let pressedOutside = false
+settingsDialog.addEventListener('pointerdown', (event) => (pressedOutside = event.target === settingsDialog))
+settingsDialog.addEventListener('click', (event) => {
+  if (pressedOutside && event.target === settingsDialog) settingsDialog.close()
 })
 
 $('settings').addEventListener('submit', async (event) => {
@@ -800,7 +823,7 @@ $('settings').addEventListener('submit', async (event) => {
   try {
     ;[token, jenkinsToken] = await placeTokens(keychain, current.keychain, { github: token, jenkins: jenkinsToken })
   } catch (error) {
-    showError(`Couldn't ${keychain ? 'save to' : 'move out of'} the macOS Keychain: ${error instanceof Error ? error.message : String(error)}. Nothing was changed.`)
+    showSettingsError(`Couldn't ${keychain ? 'save to' : 'move out of'} the macOS Keychain: ${error instanceof Error ? error.message : String(error)}. Nothing was changed.`)
     return
   }
   await saveSettings({
@@ -820,8 +843,7 @@ $('settings').addEventListener('submit', async (event) => {
   input('jenkins-token').value = ''
   if (typedJenkins || current.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
   input('token').placeholder = typed || current.token ? 'Token saved — paste a new one to replace it' : 'github_pat_…'
-  $('settings').hidden = true
-  $('toggle-settings').setAttribute('aria-expanded', 'false')
+  settingsDialog.close()
   await doRefresh()
 })
 
@@ -839,11 +861,7 @@ async function grantJenkins() {
   if (state.jenkinsGranted) await doRefresh()
 }
 $('jenkins-grant').addEventListener('click', () => void grantJenkins())
-$('jenkins-setup').addEventListener('click', () => {
-  $('settings').hidden = false
-  $('toggle-settings').setAttribute('aria-expanded', 'true')
-  input('jenkins-user').focus()
-})
+$('jenkins-setup').addEventListener('click', () => openSettings('jenkins-user'))
 /** Settings line for the Claude Code helper: connected, not installed, or off. */
 async function paintClaudeCode() {
   $('cc-install').textContent = `sh native/install.sh ${chrome.runtime.id}`
@@ -919,7 +937,7 @@ async function placeTokens(keychain, wasKeychain, tokens) {
 
 $('jenkins-token-clear').addEventListener('click', async () => {
   const current = await loadSettings()
-  if (current.jenkinsToken === KEYCHAIN_REF) await secrets.delete('jenkins').catch((error) => showError(`Couldn't remove the Jenkins token from the Keychain: ${error.message}`))
+  if (current.jenkinsToken === KEYCHAIN_REF) await secrets.delete('jenkins').catch((error) => showSettingsError(`Couldn't remove the Jenkins token from the Keychain: ${error.message}`))
   await saveSettings({ ...current, jenkinsToken: '' })
   state.jenkinsHasToken = false
   input('jenkins-token').placeholder = 'Paste an API token (optional)'
@@ -1002,8 +1020,7 @@ async function init() {
   showError(typeof lastError === 'string' ? lastError : null)
   paint()
   if (!settings.token) {
-    $('settings').hidden = false
-    $('toggle-settings').setAttribute('aria-expanded', 'true')
+    openSettings()
   } else if (!snapshot || Date.now() - Date.parse(snapshot.fetchedAt) > 60_000) {
     void doRefresh()
   }

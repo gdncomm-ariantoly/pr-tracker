@@ -109,6 +109,7 @@ try {
   check('and resumes in the project the helper knows', ((await marked.getAttribute('title')) ?? '').startsWith(`cd '/work/api' && claude --resume ${SESSION}`))
   await page.click('#toggle-settings')
   check('Settings says the helper is connected', ((await page.textContent('#cc-status')) ?? '').startsWith('Connected — sessions are looked up'), (await page.textContent('#cc-status')) ?? '')
+  await page.click('#settings-close')
 
   console.log('\nPR Tracker — Summarize via Claude Code')
   const ask = card.locator('.ai-ask:not([hidden])')
@@ -139,8 +140,8 @@ try {
   await page.check('#keychain')
   await page.fill('#token', 'not a token!')
   await page.click('#settings button[type=submit]')
-  await page.waitForFunction(() => !!document.querySelector('#error:not([hidden])')?.textContent)
-  check('a Keychain failure is shown and nothing is saved', ((await page.textContent('#error')) ?? '').includes('Keychain') && (await stored()).keychain !== true, (await page.textContent('#error')) ?? '')
+  await page.waitForFunction(() => !!document.querySelector('#settings-error:not([hidden])')?.textContent)
+  check('a Keychain failure is shown in Settings and nothing is saved', ((await page.textContent('#settings-error')) ?? '').includes('Keychain') && (await page.isVisible('#settings')) && (await stored()).keychain !== true, (await page.textContent('#settings-error')) ?? '')
   await openSettings()
   await page.fill('#token', 'github_pat_keychain_test')
   await page.click('#settings button[type=submit]')

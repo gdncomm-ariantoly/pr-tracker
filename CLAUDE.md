@@ -27,7 +27,7 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `lib/overrides.js` | User's "No action needed" marks layered over analysis |
 | `lib/sessions.js` | PR ↔ Claude Code session links (comment marker + helper scan) |
 | `lib/store.js` | Settings, snapshot, caches in `chrome.storage.local` (storage area is an argument for tests) |
-| `pages/app.html`, `app.js`, `app.css` | Dashboard page UI |
+| `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings is a modal `<dialog>` (`#settings-dialog`), with its own error line `#settings-error` since the page banner sits behind it |
 | `pages/markdown.js` | Renders GitHub `bodyHTML` through an allowlist, parsed inert; never trust remote HTML |
 | `native/` | Local native-messaging helper: `host.mjs` (sessions scan, runs `claude -p` with no tools), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` |
 | `tests/` | `node --test` unit tests, `tests/fixtures/` sample GraphQL data |
@@ -68,7 +68,7 @@ Real-data check: `gh api graphql --input <(node tools/print-query.mjs) > /tmp/da
 - Keep `chrome.*` out of `lib/`; inject dependencies so tests run in Node.
 - Service worker holds no in-memory state that matters; everything persists in `chrome.storage.local`.
 - GitHub facts (resolved thread, outdated code) are never overruled by Claude.
-- Tokens (GitHub, Jenkins) live only in `chrome.storage.local` and go only to their own host. Optional host permissions are requested only when the feature is enabled.
+- Tokens (GitHub, Jenkins) live in `chrome.storage.local`, or in the macOS Keychain via the helper (storage then holds `@keychain`), and go only to their own host. Optional host permissions are requested only when the feature is enabled.
 - Comment HTML goes through `pages/markdown.js`; do not insert remote HTML directly.
 
 ## Security considerations

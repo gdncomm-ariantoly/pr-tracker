@@ -20,7 +20,12 @@
 
     <div class="layout" id="layout">
     <div class="content">
-    <form class="settings" id="settings" hidden>
+    <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+    <form class="settings" id="settings">
+      <div class="settings-head">
+        <h2 id="settings-title">Settings</h2>
+        <button type="button" class="close" id="settings-close" aria-label="Close settings" title="Close (Esc)">×</button>
+      </div>
       <label>
         GitHub token
         <input type="password" id="token" autocomplete="off" spellcheck="false" placeholder="github_pat_…" />
@@ -84,11 +89,13 @@
         Desktop notifications for updates
         <small class="muted">New comments on your PRs, approvals, new review requests, and your comments getting fixed or answered on PRs you review. Checked on each refresh while Chrome is running.</small>
       </label>
-      <div class="row">
+      <p class="banner error" id="settings-error" role="alert" hidden></p>
+      <div class="row settings-foot">
         <button type="submit" class="primary">Save</button>
         <a href="https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&amp;description=Read-only+PR+dashboard&amp;target_name=gdncomm&amp;expires_in=90&amp;pull_requests=read&amp;contents=read&amp;statuses=read" target="_blank" rel="noopener">Create a fine-grained token ↗</a>
       </div>
     </form>
+    </dialog>
 
     <p class="banner error" id="error" role="alert" hidden></p>
     <p class="banner warning" id="warning" role="status" hidden></p>

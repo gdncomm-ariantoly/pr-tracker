@@ -102,7 +102,7 @@ Clicking a notification opens that comment on GitHub. More than 4 updates at onc
    - Repository access: **All repositories**
    - Permissions: **Pull requests**, **Contents** and **Commit statuses**, all Read-only (Metadata is automatic). Commit statuses is what shows the Jenkins build.
 2. If the org requires approval, wait until the token is no longer **pending**. No "Configure SSO" step is needed for fine-grained tokens.
-3. Open PR Tracker → Settings → paste it → Save.
+3. Open PR Tracker → Settings (opens as a pop-up; Esc or × closes it) → paste it → Save.
 
 Only gdncomm repositories are covered: a fine-grained token has a single resource owner. A classic `repo` token also works (authorize it for SSO), but it grants far more than this read-only dashboard needs. It is stored only in this browser (`chrome.storage.local`, or the macOS Keychain — below) and sent only to `api.github.com`.
 
