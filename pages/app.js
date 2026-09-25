@@ -3,6 +3,7 @@ import { renderComment } from './markdown.js'
 import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
+import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { CLAUDE_ORIGIN } from '../lib/claude.js'
 import { deployJenkinsLink, JENKINS_TEMPLATE, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
@@ -341,6 +342,33 @@ function renderPR(pr, viewer, showRepo) {
   title.href = pr.url
   const meta = [showRepo ? pr.repo : '', state.tab === 'toReview' ? `by ${pr.author}` : '', `updated ${ago(pr.updatedAt)}`]
   setText(el, '.repo', meta.filter(Boolean).join(' · '))
+  // My PRs: who approved, who wants changes, whose review is still pending.
+  const approvals = /** @type {HTMLElement} */ (el.querySelector('.approvals'))
+  const a = pr.approvals
+  if (state.tab === 'mine' && a) {
+    const names = (/** @type {string[]} */ list) => list.map((l) => (l.startsWith('@') ? l : shortLogin(l, pr.repo))).join(', ')
+    const rows = /** @type {[string, string, string[]][]} */ ([
+      ['ap-ok', 'Approved by', a.approvedBy],
+      ['ap-bad', 'Changes requested by', a.changesBy],
+      ['ap-wait', 'Waiting on', a.waitingOn],
+    ])
+    for (const [cls, label, list] of rows) {
+      if (!list.length) continue
+      const row = document.createElement('span')
+      row.className = `ap ${cls}`
+      const b = document.createElement('b')
+      b.textContent = label
+      row.append(b, ` ${names(list)}`)
+      approvals.append(row)
+    }
+    if (!a.approvedBy.length && !a.waitingOn.length && !a.changesBy.length && !pr.isDraft) {
+      const row = document.createElement('span')
+      row.className = 'ap ap-wait'
+      row.textContent = 'No reviewer requested yet'
+      approvals.append(row)
+    }
+    approvals.hidden = !approvals.childElementCount
+  }
   const summary = /** @type {HTMLElement} */ (el.querySelector('.ai-summary'))
   summary.hidden = !pr.aiSummary
   setText(el, '.ai-summary-text', pr.aiSummary ?? '')

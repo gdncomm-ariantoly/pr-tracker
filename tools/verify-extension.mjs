@@ -214,6 +214,25 @@ async function verify(context, id) {
   }
   const noHuman = await page.locator('article.pr .tally .chip', { hasText: 'No human comments' }).count()
   check('PRs without human comments are labelled', noHuman > 0)
+  // Approvals, for every My PR: the row says exactly what the snapshot says.
+  const expectedApprovals = await page.evaluate(async () => {
+    const { shortLogin } = await import('../lib/notify.js')
+    const { snapshot } = await chrome.storage.local.get('snapshot')
+    return /** @type {any[]} */ (/** @type {any} */ (snapshot).mine).map((p) => {
+      const n = (/** @type {string[]} */ l) => l.map((x) => (x.startsWith('@') ? x : shortLogin(x, p.repo))).join(', ')
+      const a = p.approvals
+      const parts = [a.approvedBy.length ? `Approved by ${n(a.approvedBy)}` : '', a.changesBy.length ? `Changes requested by ${n(a.changesBy)}` : '', a.waitingOn.length ? `Waiting on ${n(a.waitingOn)}` : '']
+      const any = parts.some(Boolean)
+      return { id: p.id, text: any ? parts.filter(Boolean).join('') : p.isDraft ? '' : 'No reviewer requested yet' }
+    })
+  })
+  const shownApprovals = await page.locator('article.pr').evaluateAll((els) => els.map((e) => ({ id: /** @type {HTMLElement} */ (e).dataset.id, text: e.querySelector('.approvals')?.textContent ?? '' })))
+  const approvalMismatch = expectedApprovals.filter((x) => shownApprovals.find((y) => y.id === x.id)?.text !== x.text)
+  check('My PRs say who approved, who wants changes and whose review is pending', approvalMismatch.length === 0, JSON.stringify(approvalMismatch[0]))
+  if (!process.env.FIXTURE) {
+    const row = page.locator('article.pr', { hasText: '#101 ' }).locator('.approvals')
+    check('bots are left out, teams and hidden teams are named', ((await row.textContent()) ?? '') === 'Approved by erinChanges requested by carolWaiting on dave, @backend-leads, a team', (await row.textContent()) ?? '')
+  }
 
   // Expand the first PR with findings and check one finding's anatomy.
   const withFindings = page.locator('article.pr').filter({ has: page.locator('.findings li') }).first()
@@ -389,6 +408,8 @@ async function verify(context, id) {
   await page.click('#settings button[type=submit]')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
   await page.click('#tab-toReview')
+  // The watched PR is a copy of a My PR, which may have no unfixed comments.
+  if (await page.isChecked('#only-pending')) await page.uncheck('#only-pending')
   await page.waitForSelector('article.pr[data-id="WATCHED1"]', { state: 'attached' })
   check('watched repos are searched by full name', / repo:gdncomm\/api repo:acme\/web$/.test(watchedQueries.at(-1) ?? ''), watchedQueries.at(-1))
   check('a watched PR shows under To review, labelled', ((await page.locator('article.pr[data-id="WATCHED1"] .chip.c-watch').textContent()) ?? '') === 'Watched repo')

@@ -183,6 +183,52 @@
                 }
               }
             ]
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "__typename": "User",
+                  "login": "acme-dave"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "__typename": "Team",
+                  "slug": "backend-leads",
+                  "name": "Backend Leads"
+                }
+              },
+              {
+                "requestedReviewer": null
+              }
+            ]
+          },
+          "latestOpinionatedReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "author": {
+                  "login": "acme-erin",
+                  "__typename": "User"
+                }
+              },
+              {
+                "state": "APPROVED",
+                "author": {
+                  "login": "sonar",
+                  "__typename": "Bot"
+                }
+              },
+              {
+                "state": "CHANGES_REQUESTED",
+                "author": {
+                  "login": "carol",
+                  "__typename": "User"
+                }
+              },
+              null
+            ]
           }
         },
         {

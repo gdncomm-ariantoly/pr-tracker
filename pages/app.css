@@ -120,6 +120,12 @@ details.stale .pr { opacity: .8; }
 .title { font-weight: 600; color: var(--fg); overflow-wrap: anywhere; }
 .meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin-top: 2px; }
 .chips, .tally { display: flex; gap: 6px; flex-wrap: wrap; }
+.approvals { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 12.5px; }
+.ap b { font-weight: 600; }
+.ap::before { display: inline-block; width: 1.1em; font-weight: 700; }
+.ap-ok { color: var(--ok-fg); } .ap-ok::before { content: "✓"; }
+.ap-bad { color: var(--bad-fg); } .ap-bad::before { content: "✕"; }
+.ap-wait { color: var(--warn-fg); } .ap-wait::before { content: "◷"; }
 
 .chip { font-size: 12px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; background: var(--gray-bg); color: var(--gray-fg); }
 .c-human { background: var(--info-bg); color: var(--info-fg); }
