@@ -75,3 +75,23 @@ describe('stillRequested', () => {
     assert.equal(stillRequested(req([{ __typename: 'Team', slug: 'be' }]), 'me', false), false)
   })
 })
+
+describe('tokens in the Keychain', () => {
+  it('reads a Keychain-held token only for the refresh, never storing it', async () => {
+    const area = memory()
+    await area.set({ settings: { token: '@keychain', keychain: true } })
+    /** @type {string[]} */ const auth = []
+    const fetchImpl = /** @type {typeof fetch} */ (async (_url, init) => (auth.push(String(/** @type {any} */ (init?.headers).Authorization)), new Response(JSON.stringify(fixture))))
+    await refresh({ area, fetchImpl, retryDelays: [], secrets: { get: async (name) => (name === 'github' ? 'github_pat_from_keychain' : '') } })
+    assert.ok(auth.length > 0 && auth.every((a) => a === 'Bearer github_pat_from_keychain'))
+    assert.equal(/** @type {any} */ (area.data.settings).token, '@keychain', 'storage still holds only the reference')
+  })
+
+  it('says so when the helper cannot hand the token over', async () => {
+    const area = memory()
+    await area.set({ settings: { token: '@keychain', keychain: true } })
+    await assert.rejects(refresh({ area, fetchImpl: github(() => null), retryDelays: [], secrets: { get: async () => { throw new Error('the Claude Code helper is not connected') } } }), /Couldn't read your GitHub token from the macOS Keychain: the Claude Code helper is not connected/)
+    assert.match(String(/** @type {any} */ (area.data).lastError), /macOS Keychain/)
+    await assert.rejects(refresh({ area, fetchImpl: github(() => null), retryDelays: [] }), /in the macOS Keychain, but the Claude Code helper isn't available/)
+  })
+})

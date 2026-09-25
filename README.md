@@ -43,6 +43,12 @@ then Settings → *Claude Code sessions* → **Connect** (asks Chrome for `nativ
 
 `--hook` adds a PreToolUse hook to `~/.claude/settings.json` (backed up first; your other hooks are kept) that appends `<!-- claude-code-session: <id> -->` to reviews and comments posted through `gh pr review|comment --body …` or GitHub MCP tools. It only rewrites the text; your permission prompt still decides. GitHub hides the marker when rendering, and PR Tracker shows a **Claude Code** tag on such comments — for anyone's, so teammates' Claude Code reviews are recognised too (a footer like "Generated with Claude Code" counts as well, without a session id).
 
+### Tokens in the macOS Keychain (optional)
+
+With the helper connected, Settings → Claude Code helper → *Keep the GitHub and Jenkins tokens in the macOS Keychain* moves both tokens out of Chrome's storage into your login Keychain (service `com.gdncomm.pr-tracker`, accounts `github` / `jenkins`). Chrome then stores only the placeholder `@keychain`; each refresh asks the helper for the token and uses it for that refresh only. The helper writes with `security -i`, so the token goes in on stdin and never appears in a process list; it accepts only the two names and token-shaped values. Unticking reads the tokens back into Chrome's storage and deletes the Keychain items.
+
+What it protects: a copy or backup of your Chrome profile no longer contains the tokens, and they're encrypted at rest with your Mac login. What it doesn't: a program running as you can still read them (through the helper or `security`), as it could read Chrome's storage before. Refreshes fail with a clear message while the helper isn't reachable.
+
 ### Jenkins build
 
 Jenkins reports each PR build to GitHub (a check run named "Jenkins CI"). The extension reads it from the PR's head commit, so no Jenkins login is needed, and shows a chip (e.g. **Jenkins #3 passed**, failed, running, queued) that links to the build. If several Jenkins jobs report, the worst one wins.

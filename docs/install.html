@@ -141,15 +141,15 @@
 
 <div class="wrap">
   <header>
-    <span class="eyebrow">Internal Chrome extension · v0.6.1</span>
+    <span class="eyebrow">Internal Chrome extension · v0.7.0</span>
     <h1>PR Tracker</h1>
     <p class="lede">One tab with your open pull requests and the ones waiting on your review, plus every comment from a real person (bots left out) and whether it's been fixed. You get a desktop alert when something changes.</p>
     <div class="actions">
-      <a class="btn" href="pr-tracker-0.6.1.zip" target="_blank" rel="noopener">
+      <a class="btn" href="pr-tracker-0.7.0.zip" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-        Download pr-tracker-0.6.1.zip
+        Download pr-tracker-0.7.0.zip
       </a>
-      <span class="meta">81 KB · Chrome 116+ · github.com (+ optional Jenkins, Claude)</span>
+      <span class="meta">83 KB · Chrome 116+ · github.com (+ optional Jenkins, Claude)</span>
     </div>
     <p class="muted" style="font-size:.9rem">The zip sits next to this page. To share, send the whole folder (this page, <code>screenshot.png</code> and the zip) over Teams or a shared drive.</p>
   </header>
@@ -263,7 +263,7 @@
         <h3>Claude Code sessions</h3>
         <p>Links each PR to the Claude Code sessions on your Mac that reviewed or discussed it, with a copyable <code>claude --resume</code> command, and runs summaries on your subscription. Needs a small local helper and Node.js. From the unzipped folder, run the command shown in Settings:</p>
         <p><code>sh native/install.sh &lt;extension-id&gt; --hook</code></p>
-        <p>then Settings → Claude Code sessions → <strong>Connect</strong>. <code>--hook</code> also marks reviews you post with Claude Code so teammates can see where they came from. <code>--uninstall</code> removes it.</p>
+        <p>then Settings → Claude Code helper → <strong>Connect</strong>. Once connected, you can also tick <em>Keep the GitHub and Jenkins tokens in the macOS Keychain</em>, so they're no longer in Chrome's storage. <code>--hook</code> also marks reviews you post with Claude Code so teammates can see where they came from. <code>--uninstall</code> removes it.</p>
       </div>
     </div>
   </section>
@@ -357,7 +357,7 @@
           <tr><td><code>notifications</code></td><td>Desktop alerts for updates</td></tr>
           <tr><td><code>api.github.com</code></td><td>Read-only GraphQL queries that fetch your PRs</td></tr>
           <tr><td><code>*.gdn-app.com</code> (optional)</td><td>Only once you add a Jenkins API token: lists team folders and reads each PR's last Jenkins build with it</td></tr>
-          <tr><td><code>nativeMessaging</code> (optional)</td><td>Only after Connect: talks to the local Claude Code helper, which reads session metadata from <code>~/.claude/projects</code> and, when you Summarize, runs <code>claude -p</code> with no tools</td></tr>
+          <tr><td><code>nativeMessaging</code> (optional)</td><td>Only after Connect: talks to the local Claude Code helper, which reads session metadata from <code>~/.claude/projects</code> when you Summarize, runs <code>claude -p</code> with no tools, and, if you choose, keeps your tokens in the macOS Keychain</td></tr>
         </tbody>
       </table>
     </div>

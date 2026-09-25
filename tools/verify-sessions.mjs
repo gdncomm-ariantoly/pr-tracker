@@ -8,8 +8,9 @@
  *   node tools/verify-sessions.mjs [--headed]
  */
 
+import { execFileSync } from 'node:child_process'
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -17,6 +18,7 @@ import { chromium } from '@playwright/test'
 
 const ROOT = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 const SESSION = '57609ddd-15b6-4739-a098-97387dc48b05'
+const KEYCHAIN_TEST = `com.gdncomm.pr-tracker.verify-${process.pid}`
 let checks = 0
 let failures = 0
 /** @param {string} label @param {boolean} ok @param {string} [detail] */
@@ -58,7 +60,8 @@ const context = await chromium.launchPersistentContext(profile, {
   env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome, HOME: work },
 })
 try {
-  await context.route('https://api.github.com/graphql', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) }))
+  /** @type {string[]} */ const githubAuth = []
+  await context.route('https://api.github.com/graphql', (r) => (githubAuth.push(r.request().headers().authorization ?? ''), r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) })))
   const sw = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'))
   const id = new URL(sw.url()).host
 
@@ -68,7 +71,8 @@ try {
   const fakeClaude = path.join(work, 'claude-bin')
   writeFileSync(fakeClaude, `#!/bin/sh\ncat > "${work}/claude-stdin"\nprintf '%s' '${JSON.stringify({ subtype: 'success', is_error: false, structured_output: { summary: 'Judged locally.', verdicts: [] } })}'\n`)
   chmodSync(fakeClaude, 0o755)
-  writeFileSync(runner, `#!/bin/sh\nexport PR_TRACKER_CLAUDE="${fakeClaude}"\nexec "${process.execPath}" "${path.join(ext, 'native/host.mjs')}" "$@"\n`)
+  // A throwaway Keychain service, so the real PR Tracker items are never touched.
+  writeFileSync(runner, `#!/bin/sh\nexport PR_TRACKER_CLAUDE="${fakeClaude}"\nexport PR_TRACKER_KEYCHAIN_SERVICE="${KEYCHAIN_TEST}"\nexport HOME="${homedir()}"\nexport PR_TRACKER_CACHE="${path.join(work, 'cache.json')}"\nexec "${process.execPath}" "${path.join(ext, 'native/host.mjs')}" "$@"\n`)
   chmodSync(runner, 0o755)
   mkdirSync(path.join(profile, 'NativeMessagingHosts'), { recursive: true })
   writeFileSync(
@@ -119,8 +123,55 @@ try {
     // not run
   }
   check('claude got the PR description on stdin', stdin.includes('Comment id='), stdin.slice(0, 80))
+
+  console.log('\nPR Tracker — tokens in the macOS Keychain')
+  const stored = async () => /** @type {any} */ (await page.evaluate(async () => (await chrome.storage.local.get('settings')).settings))
+  /** Wait until Save has written settings matching `ok`, and the refresh after it has finished. @param {(s: any) => boolean} ok */
+  const saved = async (ok) => {
+    for (let i = 0; i < 60 && !ok(await stored()); i++) await page.waitForTimeout(100)
+    await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  }
+  const openSettings = async () => {
+    if (await page.isHidden('#settings')) await page.click('#toggle-settings')
+  }
+  await openSettings()
+  check('the Keychain option is offered once the helper is connected', await page.isEnabled('#keychain'))
+  await page.check('#keychain')
+  await page.fill('#token', 'not a token!')
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => !!document.querySelector('#error:not([hidden])')?.textContent)
+  check('a Keychain failure is shown and nothing is saved', ((await page.textContent('#error')) ?? '').includes('Keychain') && (await stored()).keychain !== true, (await page.textContent('#error')) ?? '')
+  await openSettings()
+  await page.fill('#token', 'github_pat_keychain_test')
+  await page.click('#settings button[type=submit]')
+  await saved((x) => x.keychain === true)
+  for (let i = 0; i < 30 && githubAuth.at(-1) !== 'Bearer github_pat_keychain_test'; i++) await page.waitForTimeout(100)
+  const s1 = await stored()
+  check("Chrome's storage keeps only a reference, not the token", s1.token === '@keychain' && s1.keychain === true, JSON.stringify({ token: s1.token, error: await page.textContent('#error') }))
+  const inKeychain = execFileSync('/usr/bin/security', ['find-generic-password', '-s', KEYCHAIN_TEST, '-a', 'github', '-w']).toString().trim()
+  check('the token is in the Keychain', inKeychain === 'github_pat_keychain_test')
+  check('refreshes use it, read through the helper', githubAuth.at(-1) === 'Bearer github_pat_keychain_test', githubAuth.at(-1))
+  await openSettings()
+  await page.uncheck('#keychain')
+  await page.click('#settings button[type=submit]')
+  await saved((x) => x.keychain === false)
+  const s2 = await stored()
+  let gone = false
+  try {
+    execFileSync('/usr/bin/security', ['find-generic-password', '-s', KEYCHAIN_TEST, '-a', 'github'], { stdio: 'pipe' })
+  } catch {
+    gone = true
+  }
+  check('unticking moves it back and deletes it from the Keychain', s2.token === 'github_pat_keychain_test' && !s2.keychain && gone)
   check('no page errors', errors.length === 0, errors[0])
 } finally {
+  for (const name of ['github', 'jenkins']) {
+    try {
+      execFileSync('/usr/bin/security', ['delete-generic-password', '-s', KEYCHAIN_TEST, '-a', name], { stdio: 'pipe' })
+    } catch {
+      // not there
+    }
+  }
   await context.close()
   rmSync(work, { recursive: true, force: true })
 }

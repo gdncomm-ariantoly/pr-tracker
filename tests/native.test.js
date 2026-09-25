@@ -7,7 +7,7 @@ import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { hookOutput, markCommand } from '../native/claude-code-hook.mjs'
-import { handle, judge, judgeArgs } from '../native/host.mjs'
+import { handle, judge, judgeArgs, secret } from '../native/host.mjs'
 import { indexTranscript, sessionsFor } from '../native/scan.mjs'
 import { claudeCodeMark, resumeCommand } from '../lib/sessions.js'
 
@@ -56,7 +56,7 @@ describe('transcript scan', () => {
       assert.deepEqual(answer, { ok: true, sessions: { 'o/api#5': [{ sessionId: ID, cwd: '/work/api', title: '', lastAt: '2026-01-01T00:00:00Z', kind: 'review' }] } })
       assert.ok(JSON.parse(readFileSync(cache, 'utf8'))[path.join(projects, 'p1', `${ID}.jsonl`)])
       assert.equal(statSync(cache).mode & 0o777, 0o600, 'the cache is private to this user')
-      assert.equal(/** @type {any} */ (handle({ type: 'ping' }, projects, cache)).version, 2)
+      assert.equal(/** @type {any} */ (handle({ type: 'ping' }, projects, cache)).version, 3)
       assert.equal(/** @type {any} */ (handle({ type: 'nope' }, projects, cache)).ok, false)
     } finally {
       rmSync(home, { recursive: true, force: true })
@@ -72,7 +72,7 @@ describe('transcript scan', () => {
     const out = await new Promise((resolve) => child.stdout.once('data', resolve))
     child.kill()
     const buf = /** @type {Buffer} */ (out)
-    assert.equal(JSON.parse(buf.subarray(4, 4 + buf.readUInt32LE(0)).toString()).version, 2)
+    assert.equal(JSON.parse(buf.subarray(4, 4 + buf.readUInt32LE(0)).toString()).version, 3)
   })
 })
 
@@ -111,6 +111,30 @@ describe('judge via Claude Code', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('Keychain secrets', () => {
+  it('stores, reads and deletes a token in the real macOS Keychain (a throwaway service)', { skip: process.platform !== 'darwin' }, async () => {
+    process.env.PR_TRACKER_KEYCHAIN_SERVICE = `com.gdncomm.pr-tracker.test-${process.pid}`
+    try {
+      assert.deepEqual(await secret({ type: 'secret-get', name: 'github' }), { ok: true, value: '' }, 'nothing yet')
+      assert.deepEqual(await secret({ type: 'secret-set', name: 'github', value: 'github_pat_11ABC_def-123' }), { ok: true })
+      assert.deepEqual(await secret({ type: 'secret-get', name: 'github' }), { ok: true, value: 'github_pat_11ABC_def-123' })
+      assert.deepEqual(await secret({ type: 'secret-set', name: 'github', value: 'github_pat_replaced' }), { ok: true }, 'updates in place')
+      assert.deepEqual(await secret({ type: 'secret-get', name: 'github' }), { ok: true, value: 'github_pat_replaced' })
+      assert.deepEqual(await secret({ type: 'secret-delete', name: 'github' }), { ok: true })
+      assert.deepEqual(await secret({ type: 'secret-get', name: 'github' }), { ok: true, value: '' })
+    } finally {
+      await secret({ type: 'secret-delete', name: 'github' })
+      delete process.env.PR_TRACKER_KEYCHAIN_SERVICE
+    }
+  })
+
+  it('refuses unknown names and values that would need quoting', async () => {
+    assert.equal((await secret({ type: 'secret-get', name: 'aws' })).ok, false)
+    assert.equal((await secret({ type: 'secret-set', name: 'github', value: 'x" ; rm -rf ~ ; "' })).ok, false)
+    assert.equal((await secret({ type: 'secret-set', name: 'github', value: '' })).ok, false)
   })
 })
 

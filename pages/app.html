@@ -70,12 +70,14 @@
         <small class="muted">Claude decides fixed / not fixed / no action for each comment and writes a one-line summary per PR, reused until the PR changes. It runs through Claude Code on this Mac — the <code>claude</code> command you're signed in to — via the Claude Code helper below, so connect that first. No tools, no settings, no saved session; it counts toward your Claude plan's usage. Comment text, file paths and commit messages go to Anthropic: check that's allowed for your repos.</small>
       </div>
       <div class="cc-setup">
-        <span class="label">Claude Code sessions <span class="muted">(optional)</span></span>
+        <span class="label">Claude Code helper <span class="muted">(optional)</span></span>
         <span class="row">
           <button type="button" id="cc-connect">Connect</button>
           <span id="cc-status" class="muted"></span>
         </span>
         <small class="muted">Links each PR to the Claude Code sessions on this machine that reviewed or discussed it, with a copyable <code>claude --resume</code> command. Needs a small read-only helper that scans <code>~/.claude/projects</code>. Install it once from the pr-tracker folder:<br /><code id="cc-install"></code><br />Add <code>--hook</code> to also mark reviews you post with Claude Code (a hidden <code>&lt;!-- claude-code-session: … --&gt;</code> line), so teammates' PR Tracker can tell they came from Claude Code too.</small>
+        <label class="check"><input type="checkbox" id="keychain" disabled /> <span>Keep the GitHub and Jenkins tokens in the macOS Keychain instead of Chrome's storage</span></label>
+        <small class="muted" id="keychain-note">Needs the helper connected. Tokens are then encrypted with your Mac login, and a copy or backup of your Chrome profile doesn't carry them. Refreshes need the helper to read them; untick to move them back.</small>
       </div>
       <label class="check">
         <input type="checkbox" id="notify" />

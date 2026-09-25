@@ -6,8 +6,8 @@ import { judgeOnePR, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { resumeCommand } from '../lib/sessions.js'
-import { claudeCode, helperInfo, localSessions, nativeAllowed } from '../platform.js'
-import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
+import { claudeCode, helperInfo, localSessions, nativeAllowed, secrets } from '../platform.js'
+import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, KEYCHAIN_REF, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -529,7 +529,7 @@ function refreshButton(pr) {
     event.stopPropagation()
     btn.disabled = true
     btn.classList.add('spinning')
-    const result = await refreshOnePR(pr.id, { jenkinsAllowed, localSessions, claudeCode })
+    const result = await refreshOnePR(pr.id, { jenkinsAllowed, localSessions, claudeCode, secrets })
     btn.disabled = false
     btn.classList.remove('spinning')
     if (result.kind === 'error') {
@@ -726,7 +726,7 @@ async function doRefresh() {
   btn.disabled = true
   btn.textContent = 'Refreshing…'
   try {
-    state.snapshot = await refresh({ jenkinsAllowed, localSessions, claudeCode })
+    state.snapshot = await refresh({ jenkinsAllowed, localSessions, claudeCode, secrets })
     showError(null)
     paint()
   } catch (error) {
@@ -758,14 +758,24 @@ $('settings').addEventListener('submit', async (event) => {
   const watchedBox = /** @type {HTMLTextAreaElement} */ ($('watched'))
   const watchedRepos = parseRepos(parseList(watchedBox.value))
   watchedBox.value = showRepos(watchedRepos) // what will actually be searched
+  const keychain = input('keychain').checked
+  let token = typed || current.token
+  let jenkinsToken = typedJenkins || current.jenkinsToken
+  try {
+    ;[token, jenkinsToken] = await placeTokens(keychain, current.keychain, { github: token, jenkins: jenkinsToken })
+  } catch (error) {
+    showError(`Couldn't ${keychain ? 'save to' : 'move out of'} the macOS Keychain: ${error instanceof Error ? error.message : String(error)}. Nothing was changed.`)
+    return
+  }
   await saveSettings({
-    token: typed || current.token,
+    keychain,
+    token,
     extraBots: parseList(/** @type {HTMLTextAreaElement} */ ($('bots')).value),
     refreshMinutes: Number(/** @type {HTMLSelectElement} */ ($('minutes')).value),
     notify: input('notify').checked,
     watchedRepos,
     jenkinsUser: input('jenkins-user').value.trim(),
-    jenkinsToken: typedJenkins || current.jenkinsToken,
+    jenkinsToken,
     claudeModel: /** @type {HTMLSelectElement} */ ($('claude-model')).value,
     claudeAuto: input('claude-auto').checked,
   })
@@ -814,6 +824,10 @@ async function paintClaudeCode() {
   status.textContent = cc?.state === 'error' ? `Connected, but the helper didn't answer: ${cc.message}. Is it installed?` : cc?.state === 'ok' ? 'Connected — sessions are looked up on every refresh.' : 'Connected — sessions show after the next refresh.'
   if (cc?.state === 'error') return
   const info = await helperInfo().catch(() => null)
+  // The Keychain needs helper v3; keep the box usable to untick it whatever happens.
+  const box = input('keychain')
+  box.disabled = !(info?.ok && info.keychain) && !box.checked
+  $('keychain-note').textContent = info?.ok && !info.keychain ? 'Re-run the install command below to update the helper, then this can keep your tokens in the macOS Keychain.' : $('keychain-note').textContent
   if (info?.ok && (info.version ?? 1) < 2) status.textContent += ' The helper is out of date for Claude Code summaries: re-run the install command below from the new folder.'
   else if (info?.ok && !info.claude) status.textContent += " It can't find the claude command: re-run the install command from a terminal where claude works."
 }
@@ -826,8 +840,36 @@ $('cc-connect').addEventListener('click', async () => {
   await paintClaudeCode()
 })
 
+/**
+ * Where the tokens go on Save. Into the Keychain: each plain token is written
+ * there and stored as KEYCHAIN_REF. Out of it: read back, then deleted there.
+ * Throws before anything is saved if the helper refuses.
+ *
+ * @param {boolean} keychain  wanted now
+ * @param {boolean} wasKeychain
+ * @param {{github: string, jenkins: string}} tokens  typed, or as stored
+ * @returns {Promise<[string, string]>}
+ */
+async function placeTokens(keychain, wasKeychain, tokens) {
+  const names = /** @type {const} */ (['github', 'jenkins'])
+  const out = { ...tokens }
+  if (keychain) {
+    for (const name of names) {
+      if (!out[name] || out[name] === KEYCHAIN_REF) continue
+      await secrets.set(name, out[name])
+      out[name] = KEYCHAIN_REF
+    }
+  } else if (wasKeychain) {
+    for (const name of names) if (out[name] === KEYCHAIN_REF) out[name] = await secrets.get(name)
+    for (const name of names) await secrets.delete(name)
+  }
+  return [out.github, out.jenkins]
+}
+
 $('jenkins-token-clear').addEventListener('click', async () => {
-  await saveSettings({ ...(await loadSettings()), jenkinsToken: '' })
+  const current = await loadSettings()
+  if (current.jenkinsToken === KEYCHAIN_REF) await secrets.delete('jenkins').catch((error) => showError(`Couldn't remove the Jenkins token from the Keychain: ${error.message}`))
+  await saveSettings({ ...current, jenkinsToken: '' })
   state.jenkinsHasToken = false
   input('jenkins-token').placeholder = 'Paste an API token (optional)'
   await doRefresh()
@@ -898,6 +940,8 @@ async function init() {
   const model = /** @type {HTMLSelectElement} */ ($('claude-model'))
   model.value = settings.claudeModel
   input('claude-auto').checked = settings.claudeAuto
+  input('keychain').checked = settings.keychain
+  if (settings.keychain) input('keychain').disabled = false
   // Summarize is offered once the Claude Code helper is connected.
   state.claudeReady = await nativeAllowed()
   if (settings.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'

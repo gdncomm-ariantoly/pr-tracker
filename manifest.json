@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PR Tracker",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Lists your open PRs and PRs awaiting your review, with every human comment and whether it was fixed.",
   "minimum_chrome_version": "116",
   "action": {

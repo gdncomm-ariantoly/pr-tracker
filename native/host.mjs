@@ -6,6 +6,9 @@
  *   - "judge this PR's comments": runs Claude Code headless (`claude -p`) on
  *     the user's own subscription, with every tool switched off, no settings,
  *     no MCP servers and no saved session — text in, JSON out.
+ *   - optionally, keep the GitHub and Jenkins tokens in the macOS Keychain
+ *     instead of Chrome's storage (`security`; the secret goes in on stdin,
+ *     never in a process's arguments).
  *
  * Protocol (Chrome's): each message is a 4-byte little-endian length, then
  * that many bytes of UTF-8 JSON, on stdin / stdout.
@@ -13,7 +16,10 @@
  *   → {type: 'sessions', prs: ['gdncomm/product-feed#104', …]}
  *   ← {ok: true, sessions: {'gdncomm/product-feed#104': [{sessionId, cwd, title, lastAt, kind}]}}
  *   → {type: 'judge', model, system, schema, prompt}  ← {ok: true, output: {summary, verdicts}}
- *   → {type: 'ping'}  ← {ok: true, version: 2, claude: <found the claude CLI?>}
+ *   → {type: 'secret-set', name: 'github' | 'jenkins', value}  ← {ok: true}
+ *   → {type: 'secret-get', name}  ← {ok: true, value}   (value '' when there is none)
+ *   → {type: 'secret-delete', name}  ← {ok: true}
+ *   → {type: 'ping'}  ← {ok: true, version: 3, claude: <found the claude CLI?>, keychain: true}
  */
 
 import { spawn } from 'node:child_process'
@@ -25,11 +31,16 @@ import { fileURLToPath } from 'node:url'
 import { indexAll, sessionsFor } from './scan.mjs'
 
 const ROOT = process.env.CLAUDE_CONFIG_DIR ? path.join(process.env.CLAUDE_CONFIG_DIR, 'projects') : path.join(homedir(), '.claude', 'projects')
-const CACHE = path.join(homedir(), '.cache', 'pr-tracker', 'claude-sessions.json')
+const CACHE = process.env.PR_TRACKER_CACHE || path.join(homedir(), '.cache', 'pr-tracker', 'claude-sessions.json')
 /** PR Tracker's own repo: its sessions mention PRs as test data, not as work on them. */
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-export const VERSION = 2
+export const VERSION = 3
+/** Keychain item service; the account is the secret's name. */
+export const KEYCHAIN_SERVICE = 'com.gdncomm.pr-tracker'
+const SECRET_NAMES = new Set(['github', 'jenkins'])
+/** GitHub and Jenkins tokens: letters, digits, _ - . : — nothing that needs quoting. */
+const SECRET_VALUE = /^[A-Za-z0-9_.:-]{1,512}$/
 /** A judge run longer than this is killed. */
 const JUDGE_TIMEOUT_MS = 4 * 60 * 1000
 
@@ -101,6 +112,52 @@ export async function judge(request, bin = findClaude()) {
   }
 }
 
+/**
+ * Run macOS `security`, optionally feeding it commands on stdin (`-i`).
+ * @param {string[]} args
+ * @param {string} [input]
+ * @returns {Promise<{code: number, stdout: string, stderr: string}>}
+ */
+function security(args, input, bin = process.env.PR_TRACKER_SECURITY || '/usr/bin/security') {
+  return new Promise((resolve) => {
+    const child = spawn(bin, args, { stdio: ['pipe', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (d) => (stdout += d))
+    child.stderr.on('data', (d) => (stderr += d))
+    child.on('error', (e) => resolve({ code: -1, stdout, stderr: String(e) }))
+    child.on('close', (code) => resolve({ code: code ?? -1, stdout, stderr }))
+    child.stdin.end(input ?? '')
+  })
+}
+
+/**
+ * The Keychain side: read, write or delete one token.
+ * @param {any} request
+ * @returns {Promise<{ok: true, value?: string} | {ok: false, error: string}>}
+ */
+export async function secret(request) {
+  const name = request?.name
+  if (!SECRET_NAMES.has(name)) return { ok: false, error: 'unknown secret' }
+  const base = ['-s', process.env.PR_TRACKER_KEYCHAIN_SERVICE || KEYCHAIN_SERVICE, '-a', name]
+  if (request.type === 'secret-get') {
+    const r = await security(['find-generic-password', ...base, '-w'])
+    if (r.code === 44) return { ok: true, value: '' } // not found
+    if (r.code !== 0) return { ok: false, error: `Keychain: ${r.stderr.trim() || `security exited ${r.code}`}` }
+    return { ok: true, value: r.stdout.replace(/\n$/, '') }
+  }
+  if (request.type === 'secret-delete') {
+    const r = await security(['delete-generic-password', ...base])
+    return r.code === 0 || r.code === 44 ? { ok: true } : { ok: false, error: `Keychain: ${r.stderr.trim() || `security exited ${r.code}`}` }
+  }
+  const value = request.value
+  if (typeof value !== 'string' || !SECRET_VALUE.test(value)) return { ok: false, error: "That token has characters PR Tracker doesn't expect" }
+  // Interactive mode reads the command from stdin, so the token never shows in `ps`.
+  await security(['-i'], `add-generic-password -U ${base.join(' ')} -w "${value}"\n`)
+  const back = await security(['find-generic-password', ...base, '-w'])
+  return back.code === 0 && back.stdout.replace(/\n$/, '') === value ? { ok: true } : { ok: false, error: `Keychain: couldn't save the token (${back.stderr.trim() || back.code})` }
+}
+
 /** @param {unknown} message */
 function send(message) {
   const body = Buffer.from(JSON.stringify(message), 'utf8')
@@ -111,7 +168,8 @@ function send(message) {
 
 /** @param {any} request */
 export function handle(request, root = ROOT, cacheFile = CACHE) {
-  if (request?.type === 'ping') return { ok: true, version: VERSION, claude: !!findClaude() }
+  if (request?.type === 'ping') return { ok: true, version: VERSION, claude: !!findClaude(), keychain: true }
+  if (/^secret-(?:get|set|delete)$/.test(String(request?.type))) return secret(request)
   if (request?.type === 'judge') return judge(request)
   if (request?.type !== 'sessions' || !Array.isArray(request.prs)) return { ok: false, error: 'unknown request' }
   /** @type {Record<string, import('./scan.mjs').FileIndex>} */

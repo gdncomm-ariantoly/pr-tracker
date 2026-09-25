@@ -20,10 +20,37 @@ export const claudeCode = {
   ask: (/** @type {object} */ request) => chrome.runtime.sendNativeMessage(NATIVE_HOST, request),
 }
 
+/**
+ * The macOS Keychain, through the helper: where the GitHub and Jenkins tokens
+ * live when Settings says so. Throws when the helper is missing or refuses.
+ */
+export const secrets = {
+  /** @param {'github' | 'jenkins'} name @returns {Promise<string>} */
+  async get(name) {
+    return (await keychainCall({ type: 'secret-get', name })).value ?? ''
+  },
+  /** @param {'github' | 'jenkins'} name @param {string} value */
+  async set(name, value) {
+    await keychainCall({ type: 'secret-set', name, value })
+  },
+  /** @param {'github' | 'jenkins'} name */
+  async delete(name) {
+    await keychainCall({ type: 'secret-delete', name })
+  },
+}
+
+/** @param {object} request */
+async function keychainCall(request) {
+  if (!(await nativeAllowed()) || !chrome.runtime.sendNativeMessage) throw new Error('the Claude Code helper is not connected')
+  const answer = await chrome.runtime.sendNativeMessage(NATIVE_HOST, request)
+  if (!answer?.ok) throw new Error(answer?.error ?? 'the helper gave no answer')
+  return answer
+}
+
 /** The helper's ping: its version and whether it found the claude CLI. null when not connected. */
 export async function helperInfo() {
   if (!(await claudeCode.allowed())) return null
-  return /** @type {{ok: boolean, version?: number, claude?: boolean}} */ (await chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'ping' }))
+  return /** @type {{ok: boolean, version?: number, claude?: boolean, keychain?: boolean}} */ (await chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'ping' }))
 }
 
 /**
