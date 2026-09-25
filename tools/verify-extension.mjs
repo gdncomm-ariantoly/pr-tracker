@@ -129,8 +129,9 @@ async function verify(context, id) {
     } else {
       // Watched repos: GitHub would return their open PRs under the `watched` alias.
       const vars = JSON.parse(route.request().postData() ?? '{}').variables ?? {}
-      const watched = vars.hasWatched ? { watched: { issueCount: 1, nodes: [{ ...fixture.data.mine.nodes[0], id: 'WATCHED1', number: 900, title: 'Someone else\'s change', author: { login: 'dave', __typename: 'User' } }] } } : {}
-      watchedQueries.push(vars.hasWatched ? vars.watched : '')
+      // One request per list now; the watched list is its own request.
+      const watched = 'watched' in vars ? { watched: { issueCount: 1, nodes: [{ ...fixture.data.mine.nodes[0], id: 'WATCHED1', number: 900, title: 'Someone else\'s change', author: { login: 'dave', __typename: 'User' } }] } } : {}
+      if ('watched' in vars) watchedQueries.push(vars.watched)
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...fixture, data: { ...fixture.data, ...watched } }) })
     }
   })
@@ -431,10 +432,11 @@ async function verify(context, id) {
   await page.click('#tab-toReview')
   await page.click('#toggle-settings')
   check('Settings shows the list back, gdncomm/ dropped', (await page.inputValue('#watched')) === 'api, acme/web')
+  const watchedBeforeClear = watchedQueries.length
   await page.fill('#watched', '')
   await page.click('#settings button[type=submit]')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
-  check('clearing the list stops the watched search', watchedQueries.at(-1) === '' && (await page.locator('article.pr[data-id="WATCHED1"]').count()) === 0)
+  check('clearing the list stops the watched search', watchedQueries.length === watchedBeforeClear && (await page.locator('article.pr[data-id="WATCHED1"]').count()) === 0)
   await page.click('#tab-mine')
 
   // Build status hidden from the token: fall back to a Jenkins job link, no standing banner.

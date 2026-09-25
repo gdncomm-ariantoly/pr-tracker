@@ -108,7 +108,7 @@ describe('refresh', () => {
   })
   it('keeps the last good snapshot when a refresh fails', async () => {
     const area = fakeArea({ settings: { token: 't' }, snapshot: { viewer: 'old' } })
-    await assert.rejects(refresh({ area, fetchImpl: fakeFetch(502, { message: 'Bad gateway' }) }))
+    await assert.rejects(refresh({ area, fetchImpl: fakeFetch(502, { message: 'Bad gateway' }), retryDelays: [] }))
     assert.equal(/** @type {any} */ (area.data.snapshot).viewer, 'old')
     assert.match(String(area.data.lastError), /502/)
   })
@@ -120,14 +120,15 @@ describe('watched repositories', () => {
     const sent = []
     const fetchImpl = /** @type {typeof fetch} */ (/** @type {unknown} */ (async (/** @type {string} */ _url, /** @type {any} */ init) => {
       sent.push(JSON.parse(init.body).variables)
-      return new Response(JSON.stringify({ data: { viewer: { login: 'me' }, rateLimit: { remaining: 1 }, mine: { nodes: [] }, requested: { nodes: [] }, reviewed: { nodes: [] } } }))
+      return new Response(JSON.stringify({ data: { viewer: { login: 'me' }, rateLimit: { remaining: 1 }, mine: { nodes: [] }, requested: { nodes: [] }, reviewed: { nodes: [] }, watched: { nodes: [] } } }))
     }))
     await fetchDashboard({ token: 't', fetchImpl })
+    assert.equal(sent.filter((v) => 'watched' in v).length, 0)
     const snap = await fetchDashboard({ token: 't', watchedRepos: ['gdncomm/a', 'gdncomm/b'], fetchImpl })
-    assert.equal(sent[0].hasWatched, false)
-    assert.equal(sent[1].hasWatched, true)
-    assert.equal(sent[1].watched, watchedSearch(['gdncomm/a', 'gdncomm/b']))
-    assert.match(sent[1].watched, /-author:@me .*repo:gdncomm\/a repo:gdncomm\/b$/)
+    const watched = sent.filter((v) => 'watched' in v)
+    assert.equal(watched.length, 1)
+    assert.equal(watched[0].watched, watchedSearch(['gdncomm/a', 'gdncomm/b']))
+    assert.match(watched[0].watched, /-author:@me .*repo:gdncomm\/a repo:gdncomm\/b$/)
     assert.deepEqual(snap.watchedRepos, ['gdncomm/a', 'gdncomm/b'])
   })
 
@@ -140,5 +141,50 @@ describe('watched repositories', () => {
       watched: { nodes: [node('R', '2026-01-02T00:00:00Z'), node('W', '2026-01-01T00:00:00Z')] },
     })
     assert.deepEqual(snap.toReview.map((p) => [p.id, p.requested, !!p.watched]), [['R', true, false], ['W', false, true]])
+  })
+})
+
+describe('fetchDashboard resilience', () => {
+  /** @param {(alias: string, attempt: number) => Response} answer */
+  const server = (answer) => {
+    /** @type {Record<string, number>} */ const tries = {}
+    const fetchImpl = /** @type {typeof fetch} */ (/** @type {unknown} */ (async (/** @type {string} */ _url, /** @type {any} */ init) => {
+      const alias = Object.keys(JSON.parse(init.body).variables)[0]
+      tries[alias] = (tries[alias] ?? 0) + 1
+      return answer(alias, tries[alias])
+    }))
+    return { fetchImpl, tries }
+  }
+  const ok = (/** @type {string} */ alias) => new Response(JSON.stringify({ data: { viewer: { login: 'me' }, rateLimit: { remaining: 9 }, [alias]: { issueCount: 1, nodes: [node(`${alias}-1`, '2026-01-01T00:00:00Z')] } } }))
+  const timeout = () => new Response(JSON.stringify({ message: "We couldn't respond to your request in time." }), { status: 504 })
+
+  it('asks for each list separately, so one heavy list cannot time out the rest', async () => {
+    const { fetchImpl, tries } = server((alias) => ok(alias))
+    const snap = await fetchDashboard({ token: 't', fetchImpl, retryDelays: [] })
+    assert.deepEqual(Object.keys(tries).sort(), ['mine', 'requested', 'reviewed'])
+    assert.deepEqual(snap.mine.map((p) => p.id), ['mine-1'])
+    assert.deepEqual(snap.toReview.map((p) => p.id).sort(), ['requested-1', 'reviewed-1'])
+  })
+
+  it('retries a 504, then succeeds', async () => {
+    const { fetchImpl, tries } = server((alias, n) => (alias === 'mine' && n < 3 ? timeout() : ok(alias)))
+    const snap = await fetchDashboard({ token: 't', fetchImpl, retryDelays: [0, 0] })
+    assert.equal(tries.mine, 3)
+    assert.deepEqual(snap.mine.map((p) => p.id), ['mine-1'])
+    assert.deepEqual(snap.warnings, [])
+  })
+
+  it('shows the rest with a warning when one list keeps timing out', async () => {
+    const { fetchImpl } = server((alias) => (alias === 'reviewed' ? timeout() : ok(alias)))
+    const snap = await fetchDashboard({ token: 't', fetchImpl, retryDelays: [0] })
+    assert.deepEqual(snap.toReview.map((p) => p.id), ['requested-1'])
+    assert.match(snap.warnings?.[0] ?? '', /^Couldn't load PRs you reviewed this time \(GitHub API error 504/)
+  })
+
+  it('fails only when every list fails, and never retries a bad token', async () => {
+    await assert.rejects(fetchDashboard({ token: 't', fetchImpl: server(() => timeout()).fetchImpl, retryDelays: [0] }), /504/)
+    const { fetchImpl, tries } = server(() => new Response('', { status: 401 }))
+    await assert.rejects(fetchDashboard({ token: 't', fetchImpl, retryDelays: [0, 0] }), (e) => e instanceof GitHubError && e.kind === 'auth')
+    assert.equal(tries.mine, 1)
   })
 })

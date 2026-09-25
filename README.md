@@ -69,6 +69,8 @@ Each tab is grouped by service (the repository name without `gdncomm/`). Order i
 
 **Approvals (My PRs):** each card says who approved (**✓ Approved by**), who asked for changes (**✕ Changes requested by**) and whose review is still pending (**◷ Waiting on**, users and teams by name, e.g. *SRE-AUTOMATION-NONPROD (team)*), from GitHub's latest review per reviewer with write access and the open review requests. Bots are left out. A team hidden from a fine-grained token shows as "a team"; giving the token *Organization permissions → Members: Read-only* should reveal its name. With nobody requested and nothing reviewed it says *No reviewer requested yet*.
 
+**Loading:** each list (My PRs, review requests, PRs you reviewed, watched repos) is its own GitHub request, in parallel — together they're heavy enough that GitHub sometimes answers *504: We couldn't respond to your request in time*. A timed-out or failed request is retried twice (after 1 s and 3 s); if one list still fails, the others are shown with a warning saying which one is missing, and only a failure of every list shows an error.
+
 ### Updates panel
 
 Every detected update (below) is also kept in an **Updates** panel on the right: newest first, unread marked with a dot and counted in the header, last 100 kept. Clicking one opens it on GitHub and marks it read; *Mark all read* clears the count. Each update is tagged **My PR** or **To review** (desktop notifications say the same in their context line), and the **×** on hover deletes it. On windows narrower than 1100px the panel becomes a drawer behind the header's **Updates** button. The panel records updates even when desktop notifications are off.
