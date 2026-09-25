@@ -428,6 +428,19 @@ async function verify(context, id) {
   await page.waitForTimeout(800)
   check('a refresh that finds no change still stops spinning', (await page.locator('.pr-refresh.spinning, .pr-refresh:disabled').count()) === 0)
   check('without toggling the card open or shut', (await page.locator('article.pr', { hasText: '(rebased)' }).locator('details').evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open)) === wasOpen)
+  // A new comment found by a card's ↻ reaches the Updates panel like any refresh.
+  const base101 = fixture.data.mine.nodes.find((/** @type {any} */ n) => n.number === 101)
+  const threads = structuredClone(base101.reviewThreads)
+  threads.nodes.push({
+    id: 'T-card', isResolved: false, isOutdated: false, path: 'src/Card.java', line: 3, resolvedBy: null,
+    comments: { nodes: [{ id: 'C-card', author: { login: 'card-reviewer', __typename: 'User' }, body: 'Found by a card refresh.', bodyHTML: '<p>Found by a card refresh.</p>', createdAt: '2099-02-01T00:00:00Z', url: `${base101.url}#discussion_rCARD` }] },
+  })
+  singleOverride = { ...singleOverride, reviewThreads: threads }
+  const inboxCount = await page.locator('#inbox-list li').count()
+  await page.locator('article.pr', { hasText: '(rebased)' }).locator('.pr-refresh').click()
+  await page.waitForFunction((n) => document.querySelectorAll('#inbox-list li').length > n, inboxCount, { timeout: 10000 }).catch(() => {})
+  const top = page.locator('#inbox-list li').first()
+  check("a card's ↻ puts what it finds in the Updates panel", ((await top.textContent()) ?? '').includes('card-reviewer') && ((await top.getAttribute('class')) ?? '').includes('unread'), (await top.textContent()) ?? '')
   singleState = 'MERGED'
   const mineCount = await page.locator('article.pr').count()
   await page.locator('article.pr', { hasText: '(rebased)' }).locator('.pr-refresh').click()
