@@ -219,7 +219,7 @@ async function verify(context, id) {
     const { shortLogin } = await import('../lib/notify.js')
     const { snapshot } = await chrome.storage.local.get('snapshot')
     return /** @type {any[]} */ (/** @type {any} */ (snapshot).mine).map((p) => {
-      const n = (/** @type {string[]} */ l) => l.map((x) => (x.startsWith('@') ? x : shortLogin(x, p.repo))).join(', ')
+      const n = (/** @type {string[]} */ l) => l.map((x) => (x.startsWith('@') ? `${x.slice(1)} (team)` : shortLogin(x, p.repo))).join(', ')
       const a = p.approvals
       const parts = [a.approvedBy.length ? `Approved by ${n(a.approvedBy)}` : '', a.changesBy.length ? `Changes requested by ${n(a.changesBy)}` : '', a.waitingOn.length ? `Waiting on ${n(a.waitingOn)}` : '']
       const any = parts.some(Boolean)
@@ -231,7 +231,7 @@ async function verify(context, id) {
   check('My PRs say who approved, who wants changes and whose review is pending', approvalMismatch.length === 0, JSON.stringify(approvalMismatch[0]))
   if (!process.env.FIXTURE) {
     const row = page.locator('article.pr', { hasText: '#101 ' }).locator('.approvals')
-    check('bots are left out, teams and hidden teams are named', ((await row.textContent()) ?? '') === 'Approved by erinChanges requested by carolWaiting on dave, @backend-leads, a team', (await row.textContent()) ?? '')
+    check('bots are left out, teams and hidden teams are named', ((await row.textContent()) ?? '') === 'Approved by erinChanges requested by carolWaiting on dave, Backend Leads (team), a team', (await row.textContent()) ?? '')
   }
 
   // Expand the first PR with findings and check one finding's anatomy.

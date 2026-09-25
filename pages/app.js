@@ -385,7 +385,7 @@ function renderPR(pr, viewer, showRepo) {
   const approvals = /** @type {HTMLElement} */ (el.querySelector('.approvals'))
   const a = pr.approvals
   if (state.tab === 'mine' && a) {
-    const names = (/** @type {string[]} */ list) => list.map((l) => (l.startsWith('@') ? l : shortLogin(l, pr.repo))).join(', ')
+    const names = (/** @type {string[]} */ list) => list.map((l) => (l.startsWith('@') ? `${l.slice(1)} (team)` : shortLogin(l, pr.repo))).join(', ')
     const rows = /** @type {[string, string, string[]][]} */ ([
       ['ap-ok', 'Approved by', a.approvedBy],
       ['ap-bad', 'Changes requested by', a.changesBy],
@@ -398,6 +398,7 @@ function renderPR(pr, viewer, showRepo) {
       const b = document.createElement('b')
       b.textContent = label
       row.append(b, ` ${names(list)}`)
+      if (list.includes('a team')) row.title = "GitHub hides which team from your token. Add Organization permissions → Members: Read-only to the token to see the team's name."
       approvals.append(row)
     }
     if (!a.approvedBy.length && !a.waitingOn.length && !a.changesBy.length && !pr.isDraft) {

@@ -194,9 +194,9 @@ describe('analyzePR', () => {
 
 it('says who approved, who wants changes, and whose review is pending', () => {
   const a = approvalsOf(/** @type {any} */ ({
-    reviewRequests: { nodes: [{ requestedReviewer: { __typename: 'User', login: 'dave' } }, { requestedReviewer: { __typename: 'Team', slug: 'leads' } }, { requestedReviewer: null }, null] },
+    reviewRequests: { nodes: [{ requestedReviewer: { __typename: 'User', login: 'dave' } }, { requestedReviewer: { __typename: 'Team', slug: 'leads', name: 'Leads' } }, { requestedReviewer: null }, null] },
     latestOpinionatedReviews: { nodes: [{ state: 'APPROVED', author: { login: 'erin', __typename: 'User' } }, { state: 'APPROVED', author: { login: 'sonar', __typename: 'Bot' } }, { state: 'CHANGES_REQUESTED', author: { login: 'carol', __typename: 'User' } }] },
   }))
-  assert.deepEqual(a, { approvedBy: ['erin'], changesBy: ['carol'], waitingOn: ['dave', '@leads', 'a team'] })
+  assert.deepEqual(a, { approvedBy: ['erin'], changesBy: ['carol'], waitingOn: ['dave', '@Leads', 'a team'] })
   assert.deepEqual(approvalsOf(/** @type {any} */ ({})), { approvedBy: [], changesBy: [], waitingOn: [] })
 })
