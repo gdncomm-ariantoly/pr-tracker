@@ -120,6 +120,7 @@ details.stale .pr { opacity: .8; }
 .title { font-weight: 600; color: var(--fg); overflow-wrap: anywhere; }
 .meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); margin-top: 2px; }
 .chips, .tally { display: flex; gap: 6px; flex-wrap: wrap; }
+.tally { align-items: center; }
 .c-cc { background: #f4e8dc; color: #9a4b16; }
 .cc { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 0; background: #f4e8dc; color: #9a4b16; cursor: pointer; }
 .cc:disabled { cursor: default; opacity: .85; }
@@ -285,10 +286,19 @@ a.chip.build:hover { text-decoration: underline; }
 .inbox-list .i-side { justify-self: start; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 0 6px; border-radius: 4px; margin-bottom: 2px; }
 .side-mine { background: var(--info-bg); color: var(--info-fg); }
 .side-toReview { background: var(--pink-bg); color: var(--pink-fg); }
-.i-remove { position: absolute; top: 6px; right: 6px; border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 4px; opacity: 0; }
-.inbox-list li:hover .i-remove, .i-remove:focus-visible { opacity: 1; }
-.i-remove:hover { color: var(--fg); background: var(--gray-bg); }
-@media (hover: none) { .i-remove { opacity: 1; } }
+.i-remove, .i-read { position: absolute; top: 6px; right: 6px; border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 4px; opacity: 0; }
+.i-read { right: 30px; font-size: 13px; padding: 3px 6px; }
+.inbox-list li:hover .i-remove, .i-remove:focus-visible, .inbox-list li:hover .i-read, .i-read:focus-visible { opacity: 1; }
+.i-remove:hover, .i-read:hover { color: var(--fg); background: var(--gray-bg); }
+.i-read:hover { color: var(--ok-fg); }
+@media (hover: none) { .i-remove, .i-read { opacity: 1; } }
+
+.pr-refresh { border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 999px; width: 24px; height: 24px; padding: 0; font-size: 14px; line-height: 1; cursor: pointer; }
+.pr-refresh:hover { color: var(--fg); background: var(--gray-bg); }
+.pr-refresh:disabled { cursor: progress; }
+.pr-refresh.spinning { animation: pr-spin 0.8s linear infinite; }
+@keyframes pr-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pr-refresh.spinning { animation: none; opacity: 0.5; } }
 .inbox-list li:last-child { border-bottom: 0; }
 .inbox-list a { display: grid; gap: 2px; padding: 10px 32px 10px 22px; color: var(--fg); text-decoration: none; position: relative; }
 .inbox-list a:hover { background: var(--bg); }

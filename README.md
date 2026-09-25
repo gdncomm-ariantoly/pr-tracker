@@ -68,6 +68,8 @@ Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployme
 
 ### Layout
 
+**Refresh one PR:** the **↻** on each card fetches just that PR again (one small GraphQL request, under a second) — comments, approvals, Jenkins build, Claude Code sessions, and the stored Claude answer (marked outdated if the PR changed; asked anew only with *Ask automatically* on). A PR merged or closed meanwhile leaves the list with a note. Updates it brings (a new comment, an approval) reach the Updates panel and notifications like any refresh.
+
 **Watched repositories** (Settings, up to 20; a bare name means `gdncomm/…`, a github.com URL works too) add every open, non-draft PR in those repos that you didn't write to *To review*, labelled *Watched repo*, so you see them even when nobody requests your review. The **Watched repos** checkbox above the list (To review tab) hides or shows them; the choice is remembered. A PR where you're a requested reviewer, or that you already reviewed, keeps that label and is never hidden by this filter. A new PR in a repo that was already watched also raises a *New PR* update.
 
 Each tab is grouped by service (the repository name without `gdncomm/`). Order is "what needs me first": on *To review*, PRs you're on (review requested, or already reviewed by you) before PRs shown only because their repo is watched; then PRs carrying your own comments (your unfixed ones first; inside a PR your comments also lead each group); then PRs with unfixed comments, then PRs with comments (all fixed or no action needed), then PRs without human comments, newest update first within each. Groups follow their most urgent PR, except deployment repos (`prod-*`, `nonprod-*`), which always come after the services. Comments you mark *No action needed* stop counting as unfixed for sorting too. PRs with no activity for more than 7 days (GitHub's `updatedAt`: any push, comment or review) move to a collapsed **Stale** group at the bottom.
@@ -78,7 +80,7 @@ Each tab is grouped by service (the repository name without `gdncomm/`). Order i
 
 ### Updates panel
 
-Every detected update (below) is also kept in an **Updates** panel on the right: newest first, unread marked with a dot and counted in the header, last 100 kept. Clicking one opens it on GitHub and marks it read; *Mark all read* clears the count. Each update is tagged **My PR** or **To review** (desktop notifications say the same in their context line), and the **×** on hover deletes it. On windows narrower than 1100px the panel becomes a drawer behind the header's **Updates** button. The panel records updates even when desktop notifications are off.
+Every detected update (below) is also kept in an **Updates** panel on the right: newest first, unread marked with a dot and counted in the header, last 100 kept. Clicking one opens it on GitHub and marks it read; the **✓** on hover marks it read without opening it; *Mark all read* clears the count. Each update is tagged **My PR** or **To review** (desktop notifications say the same in their context line), and the **×** on hover deletes it. On windows narrower than 1100px the panel becomes a drawer behind the header's **Updates** button. The panel records updates even when desktop notifications are off.
 
 ### Notifications
 

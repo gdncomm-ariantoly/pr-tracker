@@ -2,7 +2,7 @@ import { groupPRs, STALE_DAYS } from '../lib/group.js'
 import { renderComment } from './markdown.js'
 import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
-import { judgeOnePR, refresh } from '../lib/refresh.js'
+import { judgeOnePR, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { CLAUDE_ORIGIN, keyProblem } from '../lib/claude.js'
@@ -513,7 +513,33 @@ function renderPR(pr, viewer, showRepo) {
       list.append(renderFinding(f, viewer))
     }
   }
+  tally.append(refreshButton(pr))
   return el
+}
+
+/** ↻ on a card: fetch just this PR again. @param {ReviewPR} pr */
+function refreshButton(pr) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'pr-refresh'
+  btn.textContent = '↻'
+  btn.title = 'Refresh this PR'
+  btn.setAttribute('aria-label', `Refresh #${pr.number}`)
+  btn.addEventListener('click', async (event) => {
+    event.preventDefault() // inside <summary>: don't toggle the card
+    event.stopPropagation()
+    btn.disabled = true
+    btn.classList.add('spinning')
+    const result = await refreshOnePR(pr.id, { jenkinsAllowed, claudeAllowed: jenkinsAllowed, localSessions, claudeCode })
+    // On success the stored snapshot changes and the page repaints this card.
+    if (result.kind === 'error') {
+      btn.disabled = false
+      btn.classList.remove('spinning')
+      btn.title = `Couldn't refresh: ${result.message}`
+      showError(`Couldn't refresh #${pr.number}: ${result.message}`)
+    }
+  })
+  return btn
 }
 
 /** Hidden by the Watched repos filter? */
@@ -655,7 +681,19 @@ function paintInbox() {
       paintInbox()
       void saveInbox(state.inbox)
     })
-    li.append(a, remove)
+    const read = document.createElement('button')
+    read.type = 'button'
+    read.className = 'i-read'
+    read.textContent = '✓'
+    read.title = 'Mark as read'
+    read.setAttribute('aria-label', `Mark as read: ${item.title}`)
+    read.hidden = item.read
+    read.addEventListener('click', () => {
+      state.inbox = markRead(state.inbox, item.key)
+      paintInbox()
+      void saveInbox(state.inbox)
+    })
+    li.append(a, read, remove)
     list.append(li)
   }
   $('inbox-empty').hidden = state.inbox.length > 0

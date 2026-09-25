@@ -113,6 +113,11 @@ async function verify(context, id) {
   let mode = 'ok'
   /** @type {string[]} */
   const watchedQueries = []
+  /** @type {string[]} */
+  const singleQueries = []
+  /** @type {Record<string, unknown>} */
+  let singleOverride = {}
+  let singleState = 'OPEN'
   await context.route('https://api.github.com/graphql', async (route) => {
     authHeaders.push(route.request().headers().authorization ?? '')
     if (mode === 'jenkins-hidden') {
@@ -129,6 +134,12 @@ async function verify(context, id) {
     } else {
       // Watched repos: GitHub would return their open PRs under the `watched` alias.
       const vars = JSON.parse(route.request().postData() ?? '{}').variables ?? {}
+      // A card's own Refresh asks for one PR by node id.
+      if ('id' in vars) {
+        const node = [...fixture.data.mine.nodes, ...fixture.data.requested.nodes, ...fixture.data.reviewed.nodes].find((/** @type {any} */ n) => n.id === vars.id)
+        singleQueries.push(vars.id)
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { viewer: fixture.data.viewer, rateLimit: fixture.data.rateLimit, node: node && { ...node, ...singleOverride, state: singleState } } }) })
+      }
       // One request per list now; the watched list is its own request.
       const watched = 'watched' in vars ? { watched: { issueCount: 1, nodes: [{ ...fixture.data.mine.nodes[0], id: 'WATCHED1', number: 900, title: 'Someone else\'s change', author: { login: 'dave', __typename: 'User' } }] } } : {}
       if ('watched' in vars) watchedQueries.push(vars.watched)
@@ -367,6 +378,11 @@ async function verify(context, id) {
   const side = await item.locator('.i-side').textContent()
   check('it says whether it is my PR or one to review', side === 'My PR', `${side}`) // target is from mine
   check('it is unread, with a count in the header', (await item.getAttribute('class'))?.includes('unread') === true && (await page.textContent('#unread')) === '1')
+  await item.hover()
+  await item.locator('.i-read').click()
+  check('✓ marks one update read without opening it', !((await item.getAttribute('class')) ?? '').includes('unread') && (await page.isHidden('#unread')) && (await item.locator('.i-read').isHidden()))
+  const storedRead = await page.evaluate(async () => /** @type {any[]} */ ((await chrome.storage.local.get('inbox')).inbox)[0].read)
+  check('and it stays read', storedRead === true)
   const [tab] = await Promise.all([context.waitForEvent('page'), item.locator('a').click()])
   check('clicking it opens the comment', tab.url().includes('discussion_rNEW'))
   await tab.close()
@@ -377,6 +393,24 @@ async function verify(context, id) {
   check('an update can be deleted on its own', (await page.locator('#inbox-list li').count()) === inboxBefore - 1)
   const stored = await page.evaluate(async () => /** @type {unknown[]} */ ((await chrome.storage.local.get('inbox')).inbox).length)
   check('and stays deleted', stored === inboxBefore - 1, `${stored}`)
+
+  // A card's own ↻ fetches just that PR.
+  await page.click('#tab-mine')
+  const card101 = page.locator('article.pr', { hasText: '#101 ' })
+  singleOverride = { title: 'Add caching to product lookup (rebased)' }
+  const listCalls = authHeaders.length
+  const wasOpen = await card101.locator('details').evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open)
+  await card101.locator('.pr-refresh').click()
+  await page.waitForFunction(() => [...document.querySelectorAll('article.pr .title')].some((t) => t.textContent?.includes('(rebased)')), null, { timeout: 10000 }).catch(() => {})
+  check('↻ on a card refreshes that PR only', singleQueries.length === 1 && authHeaders.length === listCalls + 1 && (await page.locator('article.pr .title', { hasText: '(rebased)' }).count()) === 1, `${singleQueries.length} single, ${authHeaders.length - listCalls} requests`)
+  check('without toggling the card open or shut', (await page.locator('article.pr', { hasText: '(rebased)' }).locator('details').evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open)) === wasOpen)
+  singleState = 'MERGED'
+  const mineCount = await page.locator('article.pr').count()
+  await page.locator('article.pr', { hasText: '(rebased)' }).locator('.pr-refresh').click()
+  await page.waitForFunction((n) => document.querySelectorAll('article.pr').length === n - 1, mineCount, { timeout: 10000 }).catch(() => {})
+  check('a merged PR leaves the list, with a note', (await page.locator('article.pr').count()) === mineCount - 1 && ((await page.textContent('#warning')) ?? '').includes('was merged'), (await page.textContent('#warning')) ?? '')
+  singleOverride = {}
+  singleState = 'OPEN'
   await page.setViewportSize({ width: 900, height: 900 })
   check('narrow window: panel hidden behind an Updates button', (await page.isHidden('#inbox')) && (await page.isVisible('#toggle-inbox')))
   await page.click('#toggle-inbox')
