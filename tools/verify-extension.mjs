@@ -157,6 +157,8 @@ async function verify(context, id) {
   const vw = page.viewportSize()?.width ?? 0
   check('the pop-up is centred and fits the window', !!box && box.x > 0 && box.x + box.width < vw && Math.abs(box.x - (vw - box.x - box.width)) < 4, JSON.stringify(box))
   await page.keyboard.press('Escape')
+  // The dialog's close event, which resets aria-expanded, is queued as a task.
+  await page.waitForFunction(() => document.getElementById('toggle-settings')?.getAttribute('aria-expanded') === 'false', null, { timeout: 2000 }).catch(() => {})
   check('Esc closes it', !(await page.isVisible('#settings')) && (await page.getAttribute('#toggle-settings', 'aria-expanded')) === 'false')
   await page.click('#toggle-settings')
   check('the Settings button opens it again', await modal())
