@@ -72,7 +72,8 @@ async function notifyUpdates(prev, next) {
     return
   }
   for (const e of events) {
-    await chrome.notifications.create(`${e.url}|${e.key}`, { ...base, title: e.title, contextMessage: e.context, message: e.message })
+    const side = e.side === 'mine' ? 'My PR' : e.side === 'toReview' ? 'To review' : ''
+    await chrome.notifications.create(`${e.url}|${e.key}`, { ...base, title: e.title, contextMessage: [side, e.context].filter(Boolean).join(' · '), message: e.message })
   }
 }
 

@@ -1,6 +1,6 @@
 import { groupPRs, STALE_DAYS } from '../lib/group.js'
 import { renderComment } from './markdown.js'
-import { markRead, normaliseInbox, unreadCount } from '../lib/inbox.js'
+import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
@@ -484,6 +484,13 @@ function paintInbox() {
     a.href = item.url
     a.target = '_blank'
     a.rel = 'noopener'
+    // Which list the PR is in, so "New comment" on my PR and on a review read differently.
+    if (item.side) {
+      const side = document.createElement('span')
+      side.className = `i-side side-${item.side}`
+      side.textContent = item.side === 'mine' ? 'My PR' : 'To review'
+      a.append(side)
+    }
     const parts = /** @type {const} */ ([['i-title', item.title], ['i-context', item.context], ['i-message', item.message], ['i-when', ago(item.at)]])
     for (const [cls, text] of parts) {
       if (!text) continue
@@ -497,7 +504,18 @@ function paintInbox() {
       paintInbox()
       void saveInbox(state.inbox)
     })
-    li.append(a)
+    const remove = document.createElement('button')
+    remove.type = 'button'
+    remove.className = 'i-remove'
+    remove.textContent = '×'
+    remove.title = 'Delete this update'
+    remove.setAttribute('aria-label', `Delete update: ${item.title}`)
+    remove.addEventListener('click', () => {
+      state.inbox = removeItem(state.inbox, item.key)
+      paintInbox()
+      void saveInbox(state.inbox)
+    })
+    li.append(a, remove)
     list.append(li)
   }
   $('inbox-empty').hidden = state.inbox.length > 0

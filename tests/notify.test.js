@@ -96,4 +96,10 @@ describe('diffSnapshots', () => {
     assert.deepEqual(diffSnapshots(before, snap({ watchedRepos: ['o/api'], toReview: [w] })).map((e) => e.title), ['New PR · API#1'])
     assert.deepEqual(diffSnapshots(snap({}), snap({ watchedRepos: ['o/api'], toReview: [w] })), [])
   })
+
+  it('says which list each update is from', () => {
+    const prev = snap({ mine: [pr({})], toReview: [pr({ id: 'R', requested: false })] })
+    const next = snap({ mine: [pr({ findings: [finding({})] })], toReview: [pr({ id: 'R', requested: true })] })
+    assert.deepEqual(diffSnapshots(prev, next).map((e) => [e.title, e.side]), [['New comment · api#1', 'mine'], ['Review requested · api#1', 'toReview']])
+  })
 })

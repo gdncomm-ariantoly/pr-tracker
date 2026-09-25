@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it } from 'node:test'
 
-import { addEvents, INBOX_LIMIT, markRead, normaliseInbox, unreadCount } from '../lib/inbox.js'
+import { addEvents, INBOX_LIMIT, markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.js'
 
 const ev = (/** @type {string} */ key) => ({ key, url: 'https://github.com/o/r/pull/1', title: key, context: '', message: '' })
 
@@ -26,4 +26,13 @@ it('marks one or all read', () => {
 it('drops malformed or non-https entries from storage', () => {
   assert.deepEqual(normaliseInbox('x'), [])
   assert.equal(normaliseInbox([{ ...ev('a'), at: '', read: false }, { ...ev('b'), url: 'javascript:1' }, null]).length, 1)
+})
+
+it('deletes one update by key, leaving the rest', () => {
+  const inbox = addEvents([], [
+    { key: 'a', url: 'https://github.com/o/r/pull/1', title: 'A', context: '', message: '' },
+    { key: 'b', url: 'https://github.com/o/r/pull/2', title: 'B', context: '', message: '' },
+  ], 't')
+  assert.deepEqual(removeItem(inbox, 'a').map((i) => i.key), ['b'])
+  assert.deepEqual(removeItem(inbox, 'zzz').map((i) => i.key), ['a', 'b'])
 })
