@@ -169,7 +169,7 @@ describe('addClaudeJudgements', () => {
 
     // The card's Summarize button asks for that one PR.
     await area.set({ snapshot: fresh, settings: { claudeKey: 'k', claudeModel: 'claude-opus-5' } })
-    assert.equal(await judgeOnePR('P1', deps), 'ok')
+    assert.deepEqual(await judgeOnePR('P1', deps), { kind: 'ok' })
     assert.equal(calls, 1)
     const saved = /** @type {any} */ (area.data.snapshot)
     assert.equal(saved.mine[0].aiSummary, 'S')
@@ -183,6 +183,35 @@ describe('addClaudeJudgements', () => {
     await addClaudeJudgements(changed, auth, deps, false)
     assert.equal(calls, 1)
     assert.equal(changed.mine[0].aiStale, true, 'kept, but marked outdated')
+  })
+})
+
+describe('Claude Code route', () => {
+  it('judges through the helper without a key, and says when the helper is missing', async () => {
+    const { claudeAuth } = await import('../lib/refresh.js')
+    const settings = /** @type {any} */ ({ claudeVia: 'claude-code', claudeKey: '', claudeModel: 'claude-sonnet-5' })
+    const auth = /** @type {import('../lib/claude.js').ClaudeAuth} */ (claudeAuth(settings))
+    assert.equal(auth.via, 'claude-code')
+    assert.equal(claudeAuth(/** @type {any} */ ({ claudeVia: 'api', claudeKey: '' })), null)
+
+    /** @type {any[]} */ const asked = []
+    const claudeCode = { allowed: async () => true, ask: async (/** @type {any} */ r) => (asked.push(r), { ok: true, output: { summary: 'Local.', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] } }) }
+    const snap = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
+    const store = /** @type {Record<string, unknown>} */ ({})
+    const area = { get: async (/** @type {string} */ k) => ({ [k]: store[k] }), set: async (/** @type {Record<string, unknown>} */ o) => void Object.assign(store, o) }
+    await addClaudeJudgements(snap, auth, { area, claudeCode })
+    assert.equal(snap.mine[0].aiSummary, 'Local.')
+    assert.equal(asked[0].type, 'judge')
+    assert.equal(asked[0].model, 'claude-sonnet-5')
+    assert.match(asked[0].prompt, /Comment id=F1/)
+
+    const off = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
+    await addClaudeJudgements(off, auth, { area, claudeCode: { ...claudeCode, allowed: async () => false } })
+    assert.deepEqual(off.claude, { state: 'no-helper' })
+
+    await area.set({ snapshot: { mine: [pr({})], toReview: [] }, settings })
+    const failing = { allowed: async () => true, ask: async () => ({ ok: false, error: 'Not logged in' }) }
+    assert.deepEqual(await judgeOnePR('P1', { area, claudeCode: failing }), { kind: 'error', message: 'Claude Code: Not logged in' })
   })
 })
 

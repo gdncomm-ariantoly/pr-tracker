@@ -47,7 +47,7 @@ try {
     const headers = await route.request().allHeaders()
     const body = JSON.parse(route.request().postData() ?? '{}')
     calls.push({ headers, body })
-    if (headers['x-api-key'] !== 'sk-ant-good') return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { message: 'invalid x-api-key' } }) })
+    if (headers['x-api-key'] !== 'sk-ant-api-good') return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { message: 'invalid x-api-key' } }) })
     const ids = [...String(body.messages?.[0]?.content ?? '').matchAll(/Comment id=(\S+)/g)].map((m) => m[1])
     const verdicts = ids.map((id, i) => ({ id, verdict: i === 0 ? 'unfixed' : 'fixed', reason: i === 0 ? 'Nothing in the commits touches this.' : 'A later commit covers it.' }))
     const judgement = { summary: `Claude summary: ${ids.length} comments looked at.`, verdicts }
@@ -74,7 +74,7 @@ try {
 
   await page.click('#toggle-settings')
   check('Sonnet 5 is the default model, asking only on demand', (await page.inputValue('#claude-model')) === 'claude-sonnet-5' && !(await page.isChecked('#claude-auto')))
-  await page.fill('#claude-key', 'sk-ant-good')
+  await page.fill('#claude-key', 'sk-ant-api-good')
   await page.click('#settings button[type=submit]')
   await settled()
   check('on demand: a refresh asks Claude nothing', calls.length === 0, `${calls.length} calls`)
@@ -101,7 +101,7 @@ try {
   await openAll()
   calls.splice(0, 1)
   const first = calls[0]
-  check('key, API version and browser-access header sent', first?.headers['x-api-key'] === 'sk-ant-good' && first.headers['anthropic-version'] === '2023-06-01' && first.headers['anthropic-dangerous-direct-browser-access'] === 'true')
+  check('key, API version and browser-access header sent', first?.headers['x-api-key'] === 'sk-ant-api-good' && first.headers['anthropic-version'] === '2023-06-01' && first.headers['anthropic-dangerous-direct-browser-access'] === 'true')
   check('the chosen model is used, with JSON-schema output', first?.body.model === 'claude-opus-5-5' && first.body.output_config?.format?.type === 'json_schema')
   const judged = await page.evaluate(async () => {
     const { snapshot } = await chrome.storage.local.get('snapshot')
@@ -128,7 +128,7 @@ try {
   check('nothing changed: no new Claude calls on refresh', calls.length === before, `${calls.length - before} new`)
 
   await page.click('#toggle-settings')
-  await page.fill('#claude-key', 'sk-ant-bad')
+  await page.fill('#claude-key', 'sk-ant-api-bad')
   await page.selectOption('#claude-model', 'claude-haiku-4-5') // new model: new signature, asked again
   await page.click('#settings button[type=submit]')
   await settled()

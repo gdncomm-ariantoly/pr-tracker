@@ -18,6 +18,7 @@ name=com.gdncomm.pr_tracker
 hosts_dir=${PR_TRACKER_HOSTS_DIR:-"$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"}
 settings=${CLAUDE_SETTINGS:-"$HOME/.claude/settings.json"}
 node_bin=$(command -v node || true)
+claude_bin=$(command -v claude || true)
 hook_cmd="\"$node_bin\" \"$here/claude-code-hook.mjs\""
 
 # Add or remove our hook in Claude Code's settings.json, leaving everything else as is.
@@ -54,9 +55,10 @@ case "$id" in
 esac
 [ -n "$node_bin" ] || { echo "node not found on PATH; install Node.js first" >&2; exit 1; }
 
-# Chrome starts the helper with a bare environment, so pin node's absolute path.
+# Chrome starts the helper with a bare environment, so pin node's (and claude's) absolute path.
 cat > "$here/host-run.sh" <<SH
 #!/bin/sh
+export PR_TRACKER_CLAUDE="$claude_bin"
 exec "$node_bin" "$here/host.mjs" "\$@"
 SH
 chmod +x "$here/host-run.sh"
@@ -65,13 +67,14 @@ mkdir -p "$hosts_dir"
 cat > "$hosts_dir/$name.json" <<JSON
 {
   "name": "$name",
-  "description": "PR Tracker: finds local Claude Code sessions for a PR (read-only)",
+  "description": "PR Tracker: finds local Claude Code sessions for a PR and runs Claude Code headless to summarize one",
   "path": "$here/host-run.sh",
   "type": "stdio",
   "allowed_origins": ["chrome-extension://$id/"]
 }
 JSON
 echo "Helper installed for extension $id."
+[ -n "$claude_bin" ] && echo "Summaries will use Claude Code at $claude_bin." || echo "claude not found on PATH: Summarize via Claude Code will not work until you re-run this where claude works."
 
 if [ "${2:-}" = "--hook" ]; then
   edit_hook add

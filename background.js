@@ -8,7 +8,7 @@ import { addEvents } from './lib/inbox.js'
 import { diffSnapshots } from './lib/notify.js'
 import { badgeFor, refresh } from './lib/refresh.js'
 import { loadInbox, loadSettings, loadSnapshot, saveInbox } from './lib/store.js'
-import { hostAllowed, localSessions } from './platform.js'
+import { claudeCode, hostAllowed, localSessions } from './platform.js'
 
 const ALARM = 'refresh'
 const APP = 'app' // notification-id prefix meaning "open the dashboard"
@@ -29,7 +29,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) {
-    void refresh({ jenkinsAllowed: hostAllowed, claudeAllowed: hostAllowed, localSessions }).catch(() => {})
+    void refresh({ jenkinsAllowed: hostAllowed, claudeAllowed: hostAllowed, localSessions, claudeCode }).catch(() => {})
   }
 })
 

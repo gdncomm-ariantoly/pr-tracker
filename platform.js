@@ -12,6 +12,21 @@ export const hostAllowed = (origin) => chrome.permissions.contains({ origins: [`
 export const nativeAllowed = () => chrome.permissions.contains({ permissions: ['nativeMessaging'] })
 
 /**
+ * Claude Code on this Mac, through the helper: `claude -p` with no tools, on
+ * the user's own Claude subscription (see native/host.mjs).
+ */
+export const claudeCode = {
+  allowed: async () => (await nativeAllowed()) && !!chrome.runtime.sendNativeMessage,
+  ask: (/** @type {object} */ request) => chrome.runtime.sendNativeMessage(NATIVE_HOST, request),
+}
+
+/** The helper's ping: its version and whether it found the claude CLI. null when not connected. */
+export async function helperInfo() {
+  if (!(await claudeCode.allowed())) return null
+  return /** @type {{ok: boolean, version?: number, claude?: boolean}} */ (await chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'ping' }))
+}
+
+/**
  * Ask the local Claude Code helper (native/host.mjs) about these PRs.
  * null: not connected (permission not granted). Throws when the helper isn't
  * installed or answers with an error.

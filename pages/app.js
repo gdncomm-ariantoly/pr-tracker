@@ -7,7 +7,7 @@ import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { CLAUDE_ORIGIN, keyProblem } from '../lib/claude.js'
 import { resumeCommand } from '../lib/sessions.js'
-import { localSessions, nativeAllowed } from '../platform.js'
+import { claudeCode, helperInfo, localSessions, nativeAllowed } from '../platform.js'
 import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
@@ -424,10 +424,12 @@ function renderPR(pr, viewer, showRepo) {
     event.stopPropagation()
     ask.disabled = true
     ask.textContent = 'Asking Claude…'
-    const result = await judgeOnePR(pr.id, { claudeAllowed: jenkinsAllowed })
-    if (result !== 'ok') {
+    const result = await judgeOnePR(pr.id, { claudeAllowed: jenkinsAllowed, claudeCode })
+    if (result.kind !== 'ok') {
       ask.disabled = false
-      ask.textContent = { 'bad-key': 'Key rejected', refused: 'Claude declined', 'no-access': 'Allow access first', error: 'Failed — retry', 'no-key': 'No key', gone: 'PR gone' }[result] ?? 'Failed'
+      ask.textContent = { 'bad-key': 'Key rejected', refused: 'Claude declined', 'no-access': 'Allow access first', 'no-helper': 'Connect Claude Code first', error: 'Failed — retry', 'no-key': 'No key', gone: 'PR gone' }[result.kind] ?? 'Failed'
+      ask.title = result.message ?? ''
+      if (result.message) showError(result.message)
     } // on success the stored snapshot changes and the page repaints
   })
 
@@ -550,6 +552,7 @@ function paint() {
   $('claude-bad-key').hidden = snap?.claude?.state !== 'bad-key'
   void paintClaudeCode()
   $('claude-grant-needed').hidden = snap?.claude?.state !== 'no-access'
+  $('claude-helper-needed').hidden = snap?.claude?.state !== 'no-helper'
   if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-token-link')).href = `${origin}/me/configure`
 
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
@@ -685,7 +688,7 @@ async function doRefresh() {
   btn.disabled = true
   btn.textContent = 'Refreshing…'
   try {
-    state.snapshot = await refresh({ jenkinsAllowed, claudeAllowed: jenkinsAllowed, localSessions })
+    state.snapshot = await refresh({ jenkinsAllowed, claudeAllowed: jenkinsAllowed, localSessions, claudeCode })
     showError(null)
     paint()
   } catch (error) {
@@ -710,7 +713,8 @@ $('settings').addEventListener('submit', async (event) => {
   // only allows the prompt synchronously inside the click, before any await.
   const typedJenkins = input('jenkins-token').value.trim()
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)
-  const typedClaude = input('claude-key').value.trim()
+  const claudeVia = /** @type {'api' | 'claude-code'} */ (/** @type {HTMLSelectElement} */ ($('claude-via')).value)
+  const typedClaude = claudeVia === 'api' ? input('claude-key').value.trim() : ''
   const badKey = typedClaude && keyProblem(typedClaude)
   if (badKey) {
     showError(badKey)
@@ -740,10 +744,11 @@ $('settings').addEventListener('submit', async (event) => {
     claudeKey: typedClaude || current.claudeKey,
     claudeModel: /** @type {HTMLSelectElement} */ ($('claude-model')).value,
     claudeAuto: input('claude-auto').checked,
+    claudeVia,
   })
   if (asking && (await asking) && origin) state.jenkinsGranted = await jenkinsAllowed(origin)
   input('claude-key').value = ''
-  state.claudeReady = !!(typedClaude || current.claudeKey)
+  state.claudeReady = claudeVia === 'claude-code' || !!(typedClaude || current.claudeKey)
   if (typedClaude || current.claudeKey) input('claude-key').placeholder = 'Key saved — paste a new one to replace it'
   state.jenkinsHasToken = !!(typedJenkins || current.jenkinsToken)
   input('token').value = ''
@@ -774,6 +779,15 @@ $('jenkins-setup').addEventListener('click', () => {
   $('toggle-settings').setAttribute('aria-expanded', 'true')
   input('jenkins-user').focus()
 })
+/** API key fields or the Claude Code note, by the chosen route. */
+function paintClaudeVia() {
+  const local = /** @type {HTMLSelectElement} */ ($('claude-via')).value === 'claude-code'
+  input('claude-key').hidden = local
+  $('claude-key-clear').hidden = local
+  $('claude-cc-note').hidden = !local
+}
+$('claude-via').addEventListener('change', paintClaudeVia)
+
 /** Settings line for the Claude Code helper: connected, not installed, or off. */
 async function paintClaudeCode() {
   $('cc-install').textContent = `sh native/install.sh ${chrome.runtime.id}`
@@ -787,6 +801,10 @@ async function paintClaudeCode() {
   connect.hidden = true
   const cc = state.snapshot?.claudeCode
   status.textContent = cc?.state === 'error' ? `Connected, but the helper didn't answer: ${cc.message}. Is it installed?` : cc?.state === 'ok' ? 'Connected — sessions are looked up on every refresh.' : 'Connected — sessions show after the next refresh.'
+  if (cc?.state === 'error') return
+  const info = await helperInfo().catch(() => null)
+  if (info?.ok && (info.version ?? 1) < 2) status.textContent += ' The helper is out of date for Claude Code summaries: re-run the install command below from the new folder.'
+  else if (info?.ok && !info.claude) status.textContent += " It can't find the claude command: re-run the install command from a terminal where claude works."
 }
 
 $('cc-connect').addEventListener('click', async () => {
@@ -881,7 +899,10 @@ async function init() {
   const model = /** @type {HTMLSelectElement} */ ($('claude-model'))
   model.value = settings.claudeModel
   input('claude-auto').checked = settings.claudeAuto
-  state.claudeReady = !!settings.claudeKey
+  const via = /** @type {HTMLSelectElement} */ ($('claude-via'))
+  via.value = settings.claudeVia
+  paintClaudeVia()
+  state.claudeReady = settings.claudeVia === 'claude-code' || !!settings.claudeKey
   if (settings.claudeKey) input('claude-key').placeholder = 'Key saved — paste a new one to replace it'
   if (settings.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)

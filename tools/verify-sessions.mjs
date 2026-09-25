@@ -64,7 +64,11 @@ try {
 
   // Register the helper for this profile, as install.sh does for real Chrome.
   const runner = path.join(work, 'host-run.sh')
-  writeFileSync(runner, `#!/bin/sh\nexec "${process.execPath}" "${path.join(ext, 'native/host.mjs')}" "$@"\n`)
+  // A stand-in claude CLI for Summarize: prints a fixed judgement, records the prompt.
+  const fakeClaude = path.join(work, 'claude-bin')
+  writeFileSync(fakeClaude, `#!/bin/sh\ncat > "${work}/claude-stdin"\nprintf '%s' '${JSON.stringify({ subtype: 'success', is_error: false, structured_output: { summary: 'Judged locally.', verdicts: [] } })}'\n`)
+  chmodSync(fakeClaude, 0o755)
+  writeFileSync(runner, `#!/bin/sh\nexport PR_TRACKER_CLAUDE="${fakeClaude}"\nexec "${process.execPath}" "${path.join(ext, 'native/host.mjs')}" "$@"\n`)
   chmodSync(runner, 0o755)
   mkdirSync(path.join(profile, 'NativeMessagingHosts'), { recursive: true })
   writeFileSync(
@@ -76,7 +80,8 @@ try {
   /** @type {string[]} */ const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto(`chrome-extension://${id}/pages/app.html`)
-  check('Settings shows the install command with this extension id', ((await page.textContent('#cc-install')) ?? '') === `sh native/install.sh ${id}`)
+  await page.waitForFunction(() => !!document.querySelector('#cc-install')?.textContent)
+  check('Settings shows the install command with this extension id', ((await page.textContent('#cc-install')) ?? '') === `sh native/install.sh ${id}`, (await page.textContent('#cc-install')) ?? '')
   await page.fill('#token', 'x')
   await page.click('#settings button[type=submit]')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh' && document.querySelector('article.pr'))
@@ -100,6 +105,24 @@ try {
   check('and resumes in the project the helper knows', ((await marked.getAttribute('title')) ?? '').startsWith(`cd '/work/api' && claude --resume ${SESSION}`))
   await page.click('#toggle-settings')
   check('Settings says the helper is connected', ((await page.textContent('#cc-status')) ?? '').startsWith('Connected — sessions are looked up'), (await page.textContent('#cc-status')) ?? '')
+
+  console.log('\nPR Tracker — Summarize via Claude Code')
+  await page.selectOption('#claude-via', 'claude-code')
+  check('choosing Claude Code hides the API key field', await page.locator('#claude-key').isHidden())
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  const ask = card.locator('.ai-ask:not([hidden])')
+  check('Summarize is offered without an API key', (await ask.count()) === 1)
+  await ask.click()
+  await page.waitForFunction(() => [...document.querySelectorAll('.ai-summary-text')].some((e) => e.textContent === 'Judged locally.'), null, { timeout: 30000 }).catch(() => {})
+  check("the summary comes from the local claude run", ((await card.locator('.ai-summary-text').textContent()) ?? '') === 'Judged locally.', (await card.locator('.ai-summary-text').textContent()) ?? '')
+  let stdin = ''
+  try {
+    stdin = readFileSync(path.join(work, 'claude-stdin'), 'utf8')
+  } catch {
+    // not run
+  }
+  check('claude got the PR description on stdin', stdin.includes('Comment id='), stdin.slice(0, 80))
   check('no page errors', errors.length === 0, errors[0])
 } finally {
   await context.close()

@@ -7,7 +7,7 @@ import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { hookOutput, markCommand } from '../native/claude-code-hook.mjs'
-import { handle } from '../native/host.mjs'
+import { handle, judge, judgeArgs } from '../native/host.mjs'
 import { indexTranscript, sessionsFor } from '../native/scan.mjs'
 import { claudeCodeMark, resumeCommand } from '../lib/sessions.js'
 
@@ -55,8 +55,8 @@ describe('transcript scan', () => {
       const answer = handle({ type: 'sessions', prs: ['o/api#5'] }, projects, cache)
       assert.deepEqual(answer, { ok: true, sessions: { 'o/api#5': [{ sessionId: ID, cwd: '/work/api', title: '', lastAt: '2026-01-01T00:00:00Z', kind: 'review' }] } })
       assert.ok(JSON.parse(readFileSync(cache, 'utf8'))[path.join(projects, 'p1', `${ID}.jsonl`)])
-      assert.deepEqual(handle({ type: 'ping' }, projects, cache), { ok: true, version: 1 })
-      assert.equal(handle({ type: 'nope' }, projects, cache).ok, false)
+      assert.equal(/** @type {any} */ (handle({ type: 'ping' }, projects, cache)).version, 2)
+      assert.equal(/** @type {any} */ (handle({ type: 'nope' }, projects, cache)).ok, false)
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
@@ -71,7 +71,45 @@ describe('transcript scan', () => {
     const out = await new Promise((resolve) => child.stdout.once('data', resolve))
     child.kill()
     const buf = /** @type {Buffer} */ (out)
-    assert.deepEqual(JSON.parse(buf.subarray(4, 4 + buf.readUInt32LE(0)).toString()), { ok: true, version: 1 })
+    assert.equal(JSON.parse(buf.subarray(4, 4 + buf.readUInt32LE(0)).toString()).version, 2)
+  })
+})
+
+describe('judge via Claude Code', () => {
+  const request = { type: 'judge', model: 'claude-sonnet-5', system: 'S', schema: { type: 'object' }, prompt: 'the PR' }
+  /** A stand-in claude CLI: records its args and stdin, prints what the test says. @param {string} dir @param {string} print */
+  const fakeClaude = (dir, print) => {
+    const bin = path.join(dir, 'claude')
+    writeFileSync(bin, `#!/bin/sh\nprintf '%s\\n' "$@" > "${dir}/args"\ncat > "${dir}/stdin"\nprintf '%s' '${print}'\n`)
+    execFileSync('chmod', ['+x', bin])
+    return bin
+  }
+
+  it('runs claude -p with every tool, setting and MCP server off, and returns the structured output', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-tracker-judge-'))
+    try {
+      const bin = fakeClaude(dir, JSON.stringify({ subtype: 'success', is_error: false, structured_output: { summary: 's', verdicts: [] } }))
+      assert.deepEqual(await judge(request, bin), { ok: true, output: { summary: 's', verdicts: [] } })
+      const args = readFileSync(path.join(dir, 'args'), 'utf8').split('\n').slice(0, -1)
+      assert.deepEqual(args, judgeArgs(request))
+      assert.equal(args[args.indexOf('--tools') + 1], '', 'no tools at all')
+      assert.ok(args.includes('--no-session-persistence') && args.includes('--strict-mcp-config'))
+      assert.equal(readFileSync(path.join(dir, 'stdin'), 'utf8'), 'the PR')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('passes on Claude Code errors (not logged in) and refuses odd requests', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-tracker-judge-'))
+    try {
+      const bin = fakeClaude(dir, JSON.stringify({ subtype: 'success', is_error: true, result: 'Not logged in · Please run /login' }))
+      assert.deepEqual(await judge(request, bin), { ok: false, error: 'Not logged in · Please run /login' })
+      assert.equal((await judge({ ...request, model: 'x; rm -rf ~' }, bin)).ok, false)
+      assert.match(/** @type {any} */ (await judge(request, null)).error, /claude command wasn't found/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

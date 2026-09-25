@@ -19,11 +19,16 @@ Bots are excluded: GitHub App accounts, `*[bot]`, plus any logins you list in Se
 
 ### Claude (optional)
 
-With an Anthropic API key in Settings, Claude judges each comment as **fixed**, **not fixed** or **no action needed** from the thread and the PR's commit list, and writes a one-line summary of what still blocks the PR, shown on its card. Statuses it decided say *· Claude* and the "Why this status" line gives its reason. GitHub's own facts are never overruled: a resolved thread or code changed under a comment keeps that status. The **No action needed** button still works on anything Claude leaves as not fixed.
+With an Anthropic API key or your Claude Code subscription (below), Claude judges each comment as **fixed**, **not fixed** or **no action needed** from the thread and the PR's commit list, and writes a one-line summary of what still blocks the PR, shown on its card. Statuses it decided say *· Claude* and the "Why this status" line gives its reason. GitHub's own facts are never overruled: a resolved thread or code changed under a comment keeps that status. The **No action needed** button still works on anything Claude leaves as not fixed.
 
 **When Claude is asked.** By default only when you click **Summarize with Claude** on a PR card: no refresh spends anything. The answer is stored and reused on every refresh; when the PR's comments, replies or commits change it stays visible, marked *outdated*, with **Summarize again**. Tick *Ask automatically on refresh* to have changed PRs asked on each refresh instead (at most 12 per refresh; unchanged PRs are never re-asked).
 
 **Model:** Sonnet 5 by default; Opus 5.5, Opus 5 or Haiku 4.5 selectable. The exact model you pick is used, never upgraded silently. Low effort (classification), JSON-schema output; Opus 5 also gets the API's server-side fallback on a refusal.
+
+**Two ways to reach Claude** (Settings → Claude):
+
+- **Claude Code on this Mac (my subscription)** — no API key. The Claude Code helper (next section; install it and click Connect) runs `claude -p` headless for each Summarize, signed in as you, so it counts against your Claude plan's usage. It runs with every tool off (`--tools ""`), no settings or MCP servers (`--setting-sources "" --strict-mcp-config`), no saved session (`--no-session-persistence`), in a scratch directory, with the PR text on stdin and JSON-schema output (`--json-schema`); about 15–20 s per PR. `install.sh` pins the `claude` path it finds on your PATH; re-run it after moving Claude Code. PR Tracker never reads or handles your Claude login itself.
+- **Anthropic API key** — see below.
 
 **Key:** an Anthropic API key (`sk-ant-api…`) from console.anthropic.com → API keys, billed per use to that Console account. A Claude.ai / Claude Code subscription login (`sk-ant-oat…`) can't be used here; Settings refuses one with that explanation. Saving the key asks Chrome for access to `api.anthropic.com`; requests go straight from the browser (raw `fetch`, since the extension has no build step to bundle the SDK). **It sends comment text, file paths and commit messages to Anthropic** — check that's allowed for your repositories — so give the key a spend limit.
 
@@ -109,6 +114,8 @@ No build step — the extension is plain ES modules and loads as it sits.
 npm install
 npm test            # unit tests — no browser needed
 node tools/verify-claude.mjs   # Claude judging, against a replayed Anthropic API
+node tools/verify-sessions.mjs # the native helper end to end: sessions + Summarize via a stand-in claude CLI
+node tools/make-screenshot.mjs # regenerate docs/screenshot.png (sample data)
 npm run typecheck   # JSDoc types via tsc --noEmit; nothing is compiled
 npm run verify      # loads the extension into a real Chromium and drives it (incl. tools/verify-jenkins.mjs)
 npm run package     # Web Store zip
