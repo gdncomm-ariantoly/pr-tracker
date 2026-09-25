@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { applyJudgement, describePR, judgePR, parseJudgement, requestBody, signature } from '../lib/claude.js'
+import { applyJudgement, describePR, judgePRLocal, parseJudgement, signature } from '../lib/claude.js'
 import { addClaudeJudgements, judgeOnePR } from '../lib/refresh.js'
 import { applyOverrides } from '../lib/overrides.js'
 
@@ -17,10 +17,11 @@ const pr = (over) => ({
   updatedAt: '2026-01-02T00:00:00Z', reviewDecision: null, hasHumanComments: true, findings: [finding({})],
   counts: { total: 1, fixed: 0, noAction: 0, pending: 1 }, commits: [{ oid: 'abc1234', at: '2026-01-01T02:00:00Z', headline: 'Rename to cacheKey' }], ...over,
 })
-/** @param {unknown} body @param {number} [status] */
-const reply = (body, status = 200) => /** @type {typeof fetch} */ (async () => new Response(JSON.stringify(body), { status }))
-/** @param {object} judgement */
-const answer = (judgement) => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(judgement) }] })
+/** A stand-in for the Claude Code helper: counts runs, answers with `judgement`. @param {any} judgement */
+const helper = (judgement, allowed = true) => {
+  const runs = /** @type {any[]} */ ([])
+  return { runs, allowed: async () => allowed, ask: async (/** @type {any} */ r) => (runs.push(r), typeof judgement === 'function' ? judgement(r) : { ok: true, output: judgement }) }
+}
 
 describe('describePR', () => {
   it('shows Claude the comments, replies and commits, and cuts huge bodies visibly', () => {
@@ -39,41 +40,21 @@ describe('describePR', () => {
   })
 })
 
-describe('requestBody', () => {
-  it('asks for schema-shaped JSON; low effort and fallbacks only where the model supports them', () => {
-    const opus = /** @type {any} */ (requestBody('claude-opus-5', 'p'))
-    assert.equal(opus.output_config.format.type, 'json_schema')
-    assert.equal(opus.output_config.effort, 'low')
-    assert.equal(opus.fallbacks, 'default')
-    const opus55 = /** @type {any} */ (requestBody('claude-opus-5-5', 'p'))
-    assert.equal(opus55.output_config.effort, 'low', 'Opus 5.5 would default to medium')
-    assert.equal(opus55.fallbacks, undefined)
-    assert.equal(opus55.thinking, undefined, 'thinking left alone: Opus 5.5 rejects disabling it')
-    const haiku = /** @type {any} */ (requestBody('claude-haiku-4-5', 'p'))
-    assert.equal(haiku.output_config.effort, undefined)
-    assert.equal(haiku.fallbacks, undefined)
-  })
-})
-
-describe('judgePR', () => {
-  const auth = { apiKey: 'k', model: 'claude-opus-5' }
-  it('sends the key, the browser-access header and the fallback beta', async () => {
-    /** @type {any} */ let seen
-    const f = /** @type {typeof fetch} */ (async (_url, init) => ((seen = init), new Response(JSON.stringify(answer({ summary: 's', verdicts: [] })))))
-    const r = await judgePR(pr({}), auth, f)
-    assert.equal(r.kind, 'ok')
-    assert.equal(seen.headers['x-api-key'], 'k')
-    assert.equal(seen.headers['anthropic-dangerous-direct-browser-access'], 'true')
-    assert.equal(seen.headers['anthropic-beta'], 'server-side-fallback-2026-07-01')
+describe('judgePRLocal', () => {
+  it('sends the prompt, system, schema and model to the helper', async () => {
+    const h = helper({ summary: 's', verdicts: [] })
+    assert.equal((await judgePRLocal(pr({}), 'claude-opus-5-5', h.ask)).kind, 'ok')
+    assert.equal(h.runs[0].type, 'judge')
+    assert.equal(h.runs[0].model, 'claude-opus-5-5')
+    assert.match(h.runs[0].prompt, /Comment id=F1/)
+    assert.equal(h.runs[0].schema.type, 'object')
   })
 
-  it('maps failures: bad key, refusal, API error, junk output', async () => {
-    assert.deepEqual(await judgePR(pr({}), auth, reply({}, 401)), { kind: 'bad-key' })
-    assert.deepEqual(await judgePR(pr({}), auth, reply({ stop_reason: 'refusal', content: [] })), { kind: 'refused' })
-    const busy = await judgePR(pr({}), auth, reply({ error: { message: 'Overloaded' } }, 529))
-    assert.equal(busy.kind, 'error')
-    assert.match(/** @type {any} */ (busy).message, /529 \(overloaded\)/)
-    assert.equal((await judgePR(pr({}), auth, reply({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'nope' }] }))).kind, 'error')
+  it('maps failures: helper error, junk output, no helper', async () => {
+    assert.deepEqual(await judgePRLocal(pr({}), 'm', helper(() => ({ ok: false, error: 'Not logged in' })).ask), { kind: 'error', message: 'Claude Code: Not logged in' })
+    assert.equal((await judgePRLocal(pr({}), 'm', helper({ nope: 1 }).ask)).kind, 'error')
+    const down = await judgePRLocal(pr({}), 'm', async () => { throw new Error('Specified native messaging host not found.') })
+    assert.match(/** @type {any} */ (down).message, /helper didn't answer: Specified native messaging host not found/)
   })
 
   it('drops verdicts it cannot use', () => {
@@ -121,56 +102,54 @@ describe('applyJudgement', () => {
 })
 
 describe('addClaudeJudgements', () => {
-  const auth = { apiKey: 'k', model: 'claude-opus-5' }
+  const auth = { model: 'claude-sonnet-5' }
   const memory = () => {
     /** @type {Record<string, unknown>} */ const data = {}
     return { data, get: async (/** @type {string} */ k) => ({ [k]: data[k] }), set: async (/** @type {Record<string, unknown>} */ o) => void Object.assign(data, o) }
   }
 
   it('asks once, then reuses the answer until something changes', async () => {
-    let calls = 0
-    const f = /** @type {typeof fetch} */ (async () => (calls++, new Response(JSON.stringify(answer({ summary: 'Nothing blocking.', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] })))))
+    const h = helper({ summary: 'Nothing blocking.', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] })
     const area = memory()
-    const deps = { area, claudeFetch: f, claudeAllowed: async () => true }
+    const deps = { area, claudeCode: h }
     const both = pr({})
     const snap = /** @type {any} */ ({ mine: [both, pr({ id: 'quiet', hasHumanComments: false, findings: [] })], toReview: [{ ...both }], warnings: [] })
     await addClaudeJudgements(snap, auth, deps)
-    assert.equal(calls, 1, 'once for a PR in both lists; none for a PR without comments')
+    assert.equal(h.runs.length, 1, 'once for a PR in both lists; none for a PR without comments')
     assert.equal(snap.mine[0].findings[0].status, 'ai-fixed')
     assert.equal(snap.toReview[0].aiSummary, 'Nothing blocking.')
 
     await addClaudeJudgements(/** @type {any} */ ({ mine: [pr({})], toReview: [] }), auth, deps)
-    assert.equal(calls, 1, 'unchanged PR: cached')
+    assert.equal(h.runs.length, 1, 'unchanged PR: cached')
     await addClaudeJudgements(/** @type {any} */ ({ mine: [pr({ commits: [] })], toReview: [] }), auth, deps)
-    assert.equal(calls, 2, 'changed PR: asked again')
+    assert.equal(h.runs.length, 2, 'changed PR: asked again')
   })
 
-  it('does nothing until Chrome grants access, and flags a bad key', async () => {
+  it('does nothing without the helper; a failed run keeps the rules and says why', async () => {
     const none = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
-    await addClaudeJudgements(none, auth, { area: memory(), claudeFetch: reply({}, 500), claudeAllowed: async () => false })
-    assert.deepEqual(none.claude, { state: 'no-access' })
+    await addClaudeJudgements(none, auth, { area: memory(), claudeCode: helper({}, false) })
+    assert.deepEqual(none.claude, { state: 'no-helper' })
     assert.equal(none.mine[0].findings[0].status, 'open')
 
-    const bad = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
-    await addClaudeJudgements(bad, auth, { area: memory(), claudeFetch: reply({}, 401), claudeAllowed: async () => true })
-    assert.equal(bad.claude.state, 'bad-key')
+    const bad = /** @type {any} */ ({ mine: [pr({})], toReview: [], warnings: [] })
+    await addClaudeJudgements(bad, auth, { area: memory(), claudeCode: helper(() => ({ ok: false, error: 'Not logged in' })) })
     assert.equal(bad.mine[0].findings[0].status, 'open', "the rules' guess stays")
+    assert.match(bad.warnings[0], /Claude couldn't judge 1 PR.*Not logged in/)
   })
 
   it('manual mode: never calls, reuses answers, flags them outdated when the PR changed', async () => {
-    let calls = 0
-    const f = /** @type {typeof fetch} */ (async () => (calls++, new Response(JSON.stringify(answer({ summary: 'S', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] })))))
+    const h = helper({ summary: 'S', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] })
     const area = memory()
-    const deps = { area, claudeFetch: f, claudeAllowed: async () => true }
+    const deps = { area, claudeCode: h }
     const fresh = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
     await addClaudeJudgements(fresh, auth, deps, false)
-    assert.equal(calls, 0)
+    assert.equal(h.runs.length, 0)
     assert.equal(fresh.mine[0].aiSummary, undefined)
 
     // The card's Summarize button asks for that one PR.
-    await area.set({ snapshot: fresh, settings: { claudeKey: 'k', claudeModel: 'claude-opus-5' } })
+    await area.set({ snapshot: fresh, settings: { claudeModel: 'claude-sonnet-5' } })
     assert.deepEqual(await judgeOnePR('P1', deps), { kind: 'ok' })
-    assert.equal(calls, 1)
+    assert.equal(h.runs.length, 1)
     const saved = /** @type {any} */ (area.data.snapshot)
     assert.equal(saved.mine[0].aiSummary, 'S')
     assert.equal(saved.mine[0].findings[0].status, 'ai-fixed')
@@ -181,46 +160,15 @@ describe('addClaudeJudgements', () => {
     assert.equal(same.mine[0].aiStale, undefined)
     const changed = /** @type {any} */ ({ mine: [pr({ commits: [] })], toReview: [] })
     await addClaudeJudgements(changed, auth, deps, false)
-    assert.equal(calls, 1)
+    assert.equal(h.runs.length, 1)
     assert.equal(changed.mine[0].aiStale, true, 'kept, but marked outdated')
   })
-})
 
-describe('Claude Code route', () => {
-  it('judges through the helper without a key, and says when the helper is missing', async () => {
-    const { claudeAuth } = await import('../lib/refresh.js')
-    const settings = /** @type {any} */ ({ claudeVia: 'claude-code', claudeKey: '', claudeModel: 'claude-sonnet-5' })
-    const auth = /** @type {import('../lib/claude.js').ClaudeAuth} */ (claudeAuth(settings))
-    assert.equal(auth.via, 'claude-code')
-    assert.equal(claudeAuth(/** @type {any} */ ({ claudeVia: 'api', claudeKey: '' })), null)
-
-    /** @type {any[]} */ const asked = []
-    const claudeCode = { allowed: async () => true, ask: async (/** @type {any} */ r) => (asked.push(r), { ok: true, output: { summary: 'Local.', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] } }) }
-    const snap = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
-    const store = /** @type {Record<string, unknown>} */ ({})
-    const area = { get: async (/** @type {string} */ k) => ({ [k]: store[k] }), set: async (/** @type {Record<string, unknown>} */ o) => void Object.assign(store, o) }
-    await addClaudeJudgements(snap, auth, { area, claudeCode })
-    assert.equal(snap.mine[0].aiSummary, 'Local.')
-    assert.equal(asked[0].type, 'judge')
-    assert.equal(asked[0].model, 'claude-sonnet-5')
-    assert.match(asked[0].prompt, /Comment id=F1/)
-
-    const off = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
-    await addClaudeJudgements(off, auth, { area, claudeCode: { ...claudeCode, allowed: async () => false } })
-    assert.deepEqual(off.claude, { state: 'no-helper' })
-
-    await area.set({ snapshot: { mine: [pr({})], toReview: [] }, settings })
-    const failing = { allowed: async () => true, ask: async () => ({ ok: false, error: 'Not logged in' }) }
-    assert.deepEqual(await judgeOnePR('P1', { area, claudeCode: failing }), { kind: 'error', message: 'Claude Code: Not logged in' })
-  })
-})
-
-describe('keyProblem', () => {
-  it('catches sign-in tokens and non-keys before Anthropic does', async () => {
-    const { keyProblem } = await import('../lib/claude.js')
-    assert.match(keyProblem('sk-ant-oat01-abc') ?? '', /sign-in token/)
-    assert.match(keyProblem('sk-ant-admin01-abc') ?? '', /Admin key/)
-    assert.match(keyProblem('eyJhbGciOi') ?? '', /doesn't look like/)
-    assert.equal(keyProblem('sk-ant-api03-abc'), null)
+  it('Summarize says what is wrong: no helper, or Claude Code failing', async () => {
+    const area = memory()
+    await area.set({ snapshot: { mine: [pr({})], toReview: [] }, settings: {} })
+    assert.deepEqual(await judgeOnePR('P1', { area, claudeCode: helper({}, false) }), { kind: 'no-helper' })
+    assert.deepEqual(await judgeOnePR('P1', { area }), { kind: 'no-helper' })
+    assert.deepEqual(await judgeOnePR('P1', { area, claudeCode: helper(() => ({ ok: false, error: 'Not logged in' })) }), { kind: 'error', message: 'Claude Code: Not logged in' })
   })
 })

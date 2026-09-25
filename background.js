@@ -7,7 +7,7 @@
 import { addEvents } from './lib/inbox.js'
 import { diffSnapshots } from './lib/notify.js'
 import { badgeFor, refresh } from './lib/refresh.js'
-import { loadInbox, loadSettings, loadSnapshot, saveInbox } from './lib/store.js'
+import { loadInbox, loadSettings, loadSnapshot, saveInbox, saveSettings } from './lib/store.js'
 import { claudeCode, hostAllowed, localSessions } from './platform.js'
 
 const ALARM = 'refresh'
@@ -22,6 +22,9 @@ chrome.action.onClicked.addListener(() => {
 
 chrome.runtime.onInstalled.addListener(() => {
   void schedule()
+  // Re-save settings in their current shape: drops an Anthropic API key
+  // stored by versions that still had that option.
+  void loadSettings().then(saveSettings)
 })
 chrome.runtime.onStartup.addListener(() => {
   void schedule()
@@ -29,7 +32,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) {
-    void refresh({ jenkinsAllowed: hostAllowed, claudeAllowed: hostAllowed, localSessions, claudeCode }).catch(() => {})
+    void refresh({ jenkinsAllowed: hostAllowed, localSessions, claudeCode }).catch(() => {})
   }
 })
 

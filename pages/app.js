@@ -5,7 +5,6 @@ import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { judgeOnePR, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
-import { CLAUDE_ORIGIN, keyProblem } from '../lib/claude.js'
 import { resumeCommand } from '../lib/sessions.js'
 import { claudeCode, helperInfo, localSessions, nativeAllowed } from '../platform.js'
 import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
@@ -424,10 +423,10 @@ function renderPR(pr, viewer, showRepo) {
     event.stopPropagation()
     ask.disabled = true
     ask.textContent = 'Asking Claude…'
-    const result = await judgeOnePR(pr.id, { claudeAllowed: jenkinsAllowed, claudeCode })
+    const result = await judgeOnePR(pr.id, { claudeCode })
     if (result.kind !== 'ok') {
       ask.disabled = false
-      ask.textContent = { 'bad-key': 'Key rejected', refused: 'Claude declined', 'no-access': 'Allow access first', 'no-helper': 'Connect Claude Code first', error: 'Failed — retry', 'no-key': 'No key', gone: 'PR gone' }[result.kind] ?? 'Failed'
+      ask.textContent = { 'no-helper': 'Connect Claude Code first', error: 'Failed — retry', gone: 'PR gone' }[result.kind] ?? 'Failed'
       ask.title = result.message ?? ''
       if (result.message) showError(result.message)
     } // on success the stored snapshot changes and the page repaints
@@ -530,14 +529,18 @@ function refreshButton(pr) {
     event.stopPropagation()
     btn.disabled = true
     btn.classList.add('spinning')
-    const result = await refreshOnePR(pr.id, { jenkinsAllowed, claudeAllowed: jenkinsAllowed, localSessions, claudeCode })
-    // On success the stored snapshot changes and the page repaints this card.
+    const result = await refreshOnePR(pr.id, { jenkinsAllowed, localSessions, claudeCode })
+    btn.disabled = false
+    btn.classList.remove('spinning')
     if (result.kind === 'error') {
-      btn.disabled = false
-      btn.classList.remove('spinning')
       btn.title = `Couldn't refresh: ${result.message}`
       showError(`Couldn't refresh #${pr.number}: ${result.message}`)
+      return
     }
+    // Repaint from storage ourselves: when nothing changed, Chrome raises no
+    // storage event, and the card would keep spinning.
+    state.snapshot = await loadSnapshot()
+    paint()
   })
   return btn
 }
@@ -575,10 +578,7 @@ function paint() {
   $('jenkins-access').hidden = !(origin && state.jenkinsHidden && !state.jenkinsHasToken)
   $('jenkins-grant-needed').hidden = !(origin && state.jenkinsHasToken && !state.jenkinsGranted)
   $('jenkins-bad-token').hidden = !snap?.jenkinsBadToken
-  $('claude-bad-key').hidden = snap?.claude?.state !== 'bad-key'
   void paintClaudeCode()
-  $('claude-grant-needed').hidden = snap?.claude?.state !== 'no-access'
-  $('claude-helper-needed').hidden = snap?.claude?.state !== 'no-helper'
   if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-token-link')).href = `${origin}/me/configure`
 
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
@@ -726,7 +726,7 @@ async function doRefresh() {
   btn.disabled = true
   btn.textContent = 'Refreshing…'
   try {
-    state.snapshot = await refresh({ jenkinsAllowed, claudeAllowed: jenkinsAllowed, localSessions, claudeCode })
+    state.snapshot = await refresh({ jenkinsAllowed, localSessions, claudeCode })
     showError(null)
     paint()
   } catch (error) {
@@ -751,20 +751,7 @@ $('settings').addEventListener('submit', async (event) => {
   // only allows the prompt synchronously inside the click, before any await.
   const typedJenkins = input('jenkins-token').value.trim()
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)
-  const claudeVia = /** @type {'api' | 'claude-code'} */ (/** @type {HTMLSelectElement} */ ($('claude-via')).value)
-  const typedClaude = claudeVia === 'api' ? input('claude-key').value.trim() : ''
-  const badKey = typedClaude && keyProblem(typedClaude)
-  if (badKey) {
-    showError(badKey)
-    input('claude-key').focus()
-    return
-  }
-  // One prompt for everything newly needed: Chrome allows a single request per click.
-  const origins = [
-    ...(typedJenkins && origin && !state.jenkinsGranted ? [`${origin}/*`] : []),
-    ...(typedClaude ? [`${CLAUDE_ORIGIN}/*`] : []),
-  ]
-  const asking = origins.length ? chrome.permissions.request({ origins }).catch(() => false) : null
+  const asking = typedJenkins && origin && !state.jenkinsGranted ? chrome.permissions.request({ origins: [`${origin}/*`] }).catch(() => false) : null
 
   const current = await loadSettings()
   const typed = input('token').value.trim()
@@ -779,15 +766,10 @@ $('settings').addEventListener('submit', async (event) => {
     watchedRepos,
     jenkinsUser: input('jenkins-user').value.trim(),
     jenkinsToken: typedJenkins || current.jenkinsToken,
-    claudeKey: typedClaude || current.claudeKey,
     claudeModel: /** @type {HTMLSelectElement} */ ($('claude-model')).value,
     claudeAuto: input('claude-auto').checked,
-    claudeVia,
   })
   if (asking && (await asking) && origin) state.jenkinsGranted = await jenkinsAllowed(origin)
-  input('claude-key').value = ''
-  state.claudeReady = claudeVia === 'claude-code' || !!(typedClaude || current.claudeKey)
-  if (typedClaude || current.claudeKey) input('claude-key').placeholder = 'Key saved — paste a new one to replace it'
   state.jenkinsHasToken = !!(typedJenkins || current.jenkinsToken)
   input('token').value = ''
   input('jenkins-token').value = ''
@@ -817,15 +799,6 @@ $('jenkins-setup').addEventListener('click', () => {
   $('toggle-settings').setAttribute('aria-expanded', 'true')
   input('jenkins-user').focus()
 })
-/** API key fields or the Claude Code note, by the chosen route. */
-function paintClaudeVia() {
-  const local = /** @type {HTMLSelectElement} */ ($('claude-via')).value === 'claude-code'
-  input('claude-key').hidden = local
-  $('claude-key-clear').hidden = local
-  $('claude-cc-note').hidden = !local
-}
-$('claude-via').addEventListener('change', paintClaudeVia)
-
 /** Settings line for the Claude Code helper: connected, not installed, or off. */
 async function paintClaudeCode() {
   $('cc-install').textContent = `sh native/install.sh ${chrome.runtime.id}`
@@ -848,21 +821,9 @@ async function paintClaudeCode() {
 $('cc-connect').addEventListener('click', async () => {
   // Synchronous inside the click: Chrome only shows the prompt for a user gesture.
   const granted = await chrome.permissions.request({ permissions: ['nativeMessaging'] }).catch(() => false)
+  state.claudeReady = !!granted
   if (granted) await doRefresh()
   await paintClaudeCode()
-})
-
-$('claude-key-clear').addEventListener('click', async () => {
-  await saveSettings({ ...(await loadSettings()), claudeKey: '' })
-  state.claudeReady = false
-  input('claude-key').placeholder = 'Anthropic API key, sk-ant-…'
-  await doRefresh()
-})
-
-$('claude-grant').addEventListener('click', async () => {
-  // Synchronous inside the click: Chrome only shows the prompt for a user gesture.
-  const granted = await chrome.permissions.request({ origins: [`${CLAUDE_ORIGIN}/*`] }).catch(() => false)
-  if (granted) await doRefresh()
 })
 
 $('jenkins-token-clear').addEventListener('click', async () => {
@@ -937,11 +898,8 @@ async function init() {
   const model = /** @type {HTMLSelectElement} */ ($('claude-model'))
   model.value = settings.claudeModel
   input('claude-auto').checked = settings.claudeAuto
-  const via = /** @type {HTMLSelectElement} */ ($('claude-via'))
-  via.value = settings.claudeVia
-  paintClaudeVia()
-  state.claudeReady = settings.claudeVia === 'claude-code' || !!settings.claudeKey
-  if (settings.claudeKey) input('claude-key').placeholder = 'Key saved — paste a new one to replace it'
+  // Summarize is offered once the Claude Code helper is connected.
+  state.claudeReady = await nativeAllowed()
   if (settings.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)
   state.jenkinsGranted = origin ? await jenkinsAllowed(origin) : false

@@ -349,6 +349,8 @@ async function verify(context, id) {
   // comment on my first PR, and check the worker raised a notification for it.
   const worker = context.serviceWorkers()[0]
   const before = await worker.evaluate(() => chrome.notifications.getAll())
+  const logo = await page.evaluate(() => { const img = /** @type {HTMLImageElement | null} */ (document.querySelector('.bar h1 img.logo')); return img ? img.complete && img.naturalWidth > 0 : false })
+  check('the header shows the extension icon', logo)
   check('no notifications on the first fetch', Object.keys(before).length === 0, JSON.stringify(before))
   const updated = structuredClone(fixture)
   const target = updated.data.mine.nodes[0]
@@ -394,6 +396,21 @@ async function verify(context, id) {
   const stored = await page.evaluate(async () => /** @type {unknown[]} */ ((await chrome.storage.local.get('inbox')).inbox).length)
   check('and stays deleted', stored === inboxBefore - 1, `${stored}`)
 
+  // A long unbroken title (real repo names) must wrap, not scroll the panel sideways.
+  await page.evaluate(async () => {
+    const { inbox } = /** @type {any} */ (await chrome.storage.local.get('inbox'))
+    const long = { key: 'long', url: 'https://github.com/gdncomm/x/pull/1', title: 'gdncomm/nonprod-infra-gdn-bq-growth-with-a-very-long-repository-name#12 Terraform_variables_for_the_new_dataset', context: 'x', message: 'y', side: 'toReview', at: new Date().toISOString(), read: false }
+    await chrome.storage.local.set({ inbox: [long, ...inbox] })
+  })
+  await page.locator('#inbox-list li[data-key="long"]').waitFor()
+  await page.locator('#inbox-list li[data-key="long"]').hover()
+  const sideways = await page.evaluate(() => {
+    const list = /** @type {HTMLElement} */ (document.querySelector('#inbox-list'))
+    const panel = /** @type {HTMLElement} */ (document.querySelector('.inbox'))
+    return { list: list.scrollWidth - list.clientWidth, panel: panel.scrollWidth - panel.clientWidth }
+  })
+  check('the Updates panel never scrolls sideways', sideways.list <= 0 && sideways.panel <= 0, JSON.stringify(sideways))
+
   // A card's own ↻ fetches just that PR.
   await page.click('#tab-mine')
   const card101 = page.locator('article.pr', { hasText: '#101 ' })
@@ -403,6 +420,11 @@ async function verify(context, id) {
   await card101.locator('.pr-refresh').click()
   await page.waitForFunction(() => [...document.querySelectorAll('article.pr .title')].some((t) => t.textContent?.includes('(rebased)')), null, { timeout: 10000 }).catch(() => {})
   check('↻ on a card refreshes that PR only', singleQueries.length === 1 && authHeaders.length === listCalls + 1 && (await page.locator('article.pr .title', { hasText: '(rebased)' }).count()) === 1, `${singleQueries.length} single, ${authHeaders.length - listCalls} requests`)
+  check('and stops spinning once done', (await page.locator('.pr-refresh.spinning').count()) === 0)
+  // Nothing changed on GitHub: no storage event, yet the button must settle.
+  await page.locator('article.pr', { hasText: '(rebased)' }).locator('.pr-refresh').click()
+  await page.waitForTimeout(800)
+  check('a refresh that finds no change still stops spinning', (await page.locator('.pr-refresh.spinning, .pr-refresh:disabled').count()) === 0)
   check('without toggling the card open or shut', (await page.locator('article.pr', { hasText: '(rebased)' }).locator('details').evaluate((d) => /** @type {HTMLDetailsElement} */ (d).open)) === wasOpen)
   singleState = 'MERGED'
   const mineCount = await page.locator('article.pr').count()

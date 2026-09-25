@@ -6,7 +6,7 @@ import { ciSearchLink, DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPL
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
   assert.deepEqual(normalise({ token: ' x ', extraBots: ['Jenkins', 3, ''], refreshMinutes: -5 }), {
-    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsUser: '', jenkinsToken: '', watchedRepos: [], claudeKey: '', claudeModel: 'claude-sonnet-5', claudeAuto: false, claudeVia: 'api',
+    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsUser: '', jenkinsToken: '', watchedRepos: [], claudeModel: 'claude-sonnet-5', claudeAuto: false,
   })
 })
 

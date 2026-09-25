@@ -56,7 +56,8 @@ button:disabled { opacity: .6; cursor: default; }
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 10px 24px; background: var(--card); border-bottom: 1px solid var(--line);
 }
-.bar h1 { font-size: 18px; margin: 0; }
+.bar h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; }
+.bar h1 .logo { width: 24px; height: 24px; flex: none; }
 
 .settings {
   margin: 16px 0 0; padding: 16px; display: grid; gap: 12px;
@@ -66,6 +67,8 @@ button:disabled { opacity: .6; cursor: default; }
 .settings small { font-weight: 400; }
 .settings label.check { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .settings label.check small { flex-basis: 100%; }
+.settings label.check > span { flex: 1; min-width: 0; font-weight: 400; }
+.settings label.inline { display: inline; font-weight: 400; }
 .settings input, .settings textarea, .settings select {
   font: inherit; padding: 6px 8px; border-radius: 6px;
   border: 1px solid var(--line); background: var(--bg); color: var(--fg);
@@ -281,7 +284,7 @@ a.chip.build:hover { text-decoration: underline; }
 .inbox-head h2 { font-size: 14px; margin: 0; }
 .inbox-head button { font-size: 12px; padding: 2px 8px; }
 .inbox-head .icon { display: none; font-size: 18px; line-height: 1; padding: 0 8px; }
-.inbox-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.inbox-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; overflow-x: hidden; }
 .inbox-list li { border-bottom: 1px solid var(--line); position: relative; }
 .inbox-list .i-side { justify-self: start; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 0 6px; border-radius: 4px; margin-bottom: 2px; }
 .side-mine { background: var(--info-bg); color: var(--info-fg); }
@@ -300,7 +303,7 @@ a.chip.build:hover { text-decoration: underline; }
 @keyframes pr-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pr-refresh.spinning { animation: none; opacity: 0.5; } }
 .inbox-list li:last-child { border-bottom: 0; }
-.inbox-list a { display: grid; gap: 2px; padding: 10px 32px 10px 22px; color: var(--fg); text-decoration: none; position: relative; }
+.inbox-list a { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 10px 56px 10px 22px; overflow-wrap: anywhere; color: var(--fg); text-decoration: none; position: relative; }
 .inbox-list a:hover { background: var(--bg); }
 .inbox-list li.unread a::before { content: ""; position: absolute; left: 9px; top: 16px; width: 7px; height: 7px; border-radius: 50%; background: var(--link); }
 .inbox-list .i-title { font-weight: 600; font-size: 13px; }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PR Tracker",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Lists your open PRs and PRs awaiting your review, with every human comment and whether it was fixed.",
   "minimum_chrome_version": "116",
   "action": {
@@ -25,9 +25,10 @@
   "host_permissions": [
     "https://api.github.com/*"
   ],
-  "optional_permissions": ["nativeMessaging"],
+  "optional_permissions": [
+    "nativeMessaging"
+  ],
   "optional_host_permissions": [
-    "https://*.gdn-app.com/*",
-    "https://api.anthropic.com/*"
+    "https://*.gdn-app.com/*"
   ]
 }

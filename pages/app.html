@@ -9,7 +9,7 @@
   </head>
   <body>
     <header class="bar">
-      <h1>PR Tracker</h1>
+      <h1><img class="logo" src="../icons/icon-48.png" alt="" width="24" height="24" />PR Tracker</h1>
       <span class="muted" id="viewer"></span>
       <span class="spacer"></span>
       <span class="muted" id="fetched"></span>
@@ -55,28 +55,20 @@
         </span>
         <small class="muted">Needed for pass/fail on each PR, because GitHub doesn't show Jenkins builds to fine-grained tokens. Create one in Jenkins → your name (top right) → Security / Configure → API Token → Add new token. Your user ID is shown on that page. The token has your full Jenkins rights; PR Tracker only reads with it. Stored only in this browser.</small>
       </label>
-      <label>
-        Claude <span class="muted">(optional)</span>
+      <div class="cc-setup">
+        <span class="label">Claude summaries <span class="muted">(optional)</span></span>
         <span class="row">
-          <select id="claude-via" aria-label="How to reach Claude">
-            <option value="api">Anthropic API key</option>
-            <option value="claude-code">Claude Code on this Mac (my subscription)</option>
-          </select>
-        </span>
-        <span class="row">
-          <input type="password" id="claude-key" autocomplete="off" spellcheck="false" placeholder="Anthropic API key, sk-ant-…" />
+          <label class="inline" for="claude-model">Model</label>
           <select id="claude-model">
             <option value="claude-sonnet-5">Sonnet 5</option>
             <option value="claude-opus-5-5">Opus 5.5</option>
             <option value="claude-opus-5">Opus 5</option>
             <option value="claude-haiku-4-5">Haiku 4.5</option>
           </select>
-          <button type="button" id="claude-key-clear">Remove key</button>
         </span>
-        <small class="muted" id="claude-cc-note" hidden>Uses the <code>claude</code> command you're signed in to, through the Claude Code helper below (Connect it first). It runs with no tools, no settings and no saved session, and counts against your Claude plan's usage.</small>
-        <span class="row check"><input type="checkbox" id="claude-auto" /> Ask automatically on refresh (only PRs whose comments, replies or commits changed). Off: only when you click <em>Summarize</em> on a PR.</span>
-        <small class="muted">Claude then decides fixed / not fixed / no action for each comment and writes a one-line summary per PR. It's asked again only when a PR's comments, replies or commits change. Sends comment text, file paths and commit messages to Anthropic — check that's allowed for your repos. Billed to the key's account; set a spend limit on it. Stored only in this browser.</small>
-      </label>
+        <label class="check"><input type="checkbox" id="claude-auto" /> <span>Ask automatically on refresh, for PRs whose comments, replies or commits changed. Off: only when you click <em>Summarize with Claude</em> on a PR.</span></label>
+        <small class="muted">Claude decides fixed / not fixed / no action for each comment and writes a one-line summary per PR, reused until the PR changes. It runs through Claude Code on this Mac — the <code>claude</code> command you're signed in to — via the Claude Code helper below, so connect that first. No tools, no settings, no saved session; it counts toward your Claude plan's usage. Comment text, file paths and commit messages go to Anthropic: check that's allowed for your repos.</small>
+      </div>
       <div class="cc-setup">
         <span class="label">Claude Code sessions <span class="muted">(optional)</span></span>
         <span class="row">
@@ -105,12 +97,6 @@
     <p class="banner info" id="jenkins-grant-needed" hidden>
       Chrome hasn't been allowed to reach Jenkins yet, so your Jenkins token isn't used.
       <button type="button" class="primary" id="jenkins-grant">Allow access to Jenkins</button>
-    </p>
-    <p class="banner error" id="claude-bad-key" hidden>Anthropic rejected your API key (401: invalid). It must be an API key from console.anthropic.com → API keys (sk-ant-api…), still active, in an organization with credit; a Claude Code or Claude.ai sign-in won't work. Paste a new one in Settings; comments are judged by the rules meanwhile.</p>
-    <p class="banner info" id="claude-helper-needed" hidden>Summaries are set to use Claude Code, but the Claude Code helper isn't connected. Install it and click Connect in Settings → Claude Code sessions.</p>
-    <p class="banner info" id="claude-grant-needed" hidden>
-      Chrome hasn't been allowed to reach api.anthropic.com yet, so Claude isn't used.
-      <button type="button" class="primary" id="claude-grant">Allow access to Claude</button>
     </p>
     <p class="banner error" id="jenkins-bad-token" hidden>
       Jenkins rejected your API token (401). Check the user name and token in Settings, or

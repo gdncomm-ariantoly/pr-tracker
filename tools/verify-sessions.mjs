@@ -107,12 +107,8 @@ try {
   check('Settings says the helper is connected', ((await page.textContent('#cc-status')) ?? '').startsWith('Connected — sessions are looked up'), (await page.textContent('#cc-status')) ?? '')
 
   console.log('\nPR Tracker — Summarize via Claude Code')
-  await page.selectOption('#claude-via', 'claude-code')
-  check('choosing Claude Code hides the API key field', await page.locator('#claude-key').isHidden())
-  await page.click('#settings button[type=submit]')
-  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
   const ask = card.locator('.ai-ask:not([hidden])')
-  check('Summarize is offered without an API key', (await ask.count()) === 1)
+  check('Summarize is offered once the helper is connected', (await ask.count()) === 1)
   await ask.click()
   await page.waitForFunction(() => [...document.querySelectorAll('.ai-summary-text')].some((e) => e.textContent === 'Judged locally.'), null, { timeout: 30000 }).catch(() => {})
   check("the summary comes from the local claude run", ((await card.locator('.ai-summary-text').textContent()) ?? '') === 'Judged locally.', (await card.locator('.ai-summary-text').textContent()) ?? '')
