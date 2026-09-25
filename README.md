@@ -41,7 +41,7 @@ sh native/install.sh <extension-id> --hook   # also mark reviews you post with C
 sh native/install.sh --uninstall
 ```
 
-then Settings → *Claude Code sessions* → **Connect** (asks Chrome for `nativeMessaging`). The helper (`native/host.mjs`) is read-only: on each refresh it scans `~/.claude/projects/*/*.jsonl` for PR links and `gh pr … --repo …` commands (cached by file size and mtime, about 1 s cold, milliseconds after) and returns only session id, project folder, title and time. "Reviewed" means the session posted a review/comment (`gh pr review|comment`), ran `/code-review` or was asked to review that PR. PR Tracker's own repo is skipped. The transcript format is internal to Claude Code, so matching is best-effort and may need updating after Claude Code upgrades; transcripts are deleted after 30 days by default.
+then Settings → *Claude Code helper* → **Connect** (asks Chrome for `nativeMessaging`). The helper (`native/host.mjs`) is read-only: on each refresh it scans `~/.claude/projects/*/*.jsonl` for PR links and `gh pr … --repo …` commands (cached by file size and mtime, about 1 s cold, milliseconds after) and returns only session id, project folder, title and time. "Reviewed" means the session posted a review/comment (`gh pr review|comment`), ran `/code-review` or was asked to review that PR. PR Tracker's own repo is skipped. The transcript format is internal to Claude Code, so matching is best-effort and may need updating after Claude Code upgrades; transcripts are deleted after 30 days by default.
 
 `--hook` adds a PreToolUse hook to `~/.claude/settings.json` (backed up first; your other hooks are kept) that appends `<!-- claude-code-session: <id> -->` to reviews and comments posted through `gh pr review|comment --body …` or GitHub MCP tools. It only rewrites the text; your permission prompt still decides. GitHub hides the marker when rendering, and PR Tracker shows a **Claude Code** tag on such comments — for anyone's, so teammates' Claude Code reviews are recognised too (a footer like "Generated with Claude Code" counts as well, without a session id).
 
@@ -104,7 +104,17 @@ Clicking a notification opens that comment on GitHub. More than 4 updates at onc
 2. If the org requires approval, wait until the token is no longer **pending**. No "Configure SSO" step is needed for fine-grained tokens.
 3. Open PR Tracker → Settings → paste it → Save.
 
-Only gdncomm repositories are covered: a fine-grained token has a single resource owner. A classic `repo` token also works (authorize it for SSO), but it grants far more than this read-only dashboard needs. It is stored only in `chrome.storage.local` of this browser and sent only to `api.github.com`.
+Only gdncomm repositories are covered: a fine-grained token has a single resource owner. A classic `repo` token also works (authorize it for SSO), but it grants far more than this read-only dashboard needs. It is stored only in this browser (`chrome.storage.local`, or the macOS Keychain — below) and sent only to `api.github.com`.
+
+### Optional
+
+- **Jenkins pass/fail:** Jenkins → your name → Security / Configure → API Token → *Add new token*; paste it with your user ID in Settings and accept Chrome's `*.gdn-app.com` prompt.
+- **Claude Code helper** (sessions, Summarize, Keychain; needs Node.js and Claude Code):
+  1. `claude auth status --text` should show a **Team** or **Enterprise** plan (for Summarize); otherwise `claude` → `/logout` → `/login` with the company account.
+  2. Run the install command from Settings → Claude Code helper, from this folder: `sh native/install.sh <extension-id> [--hook]`.
+  3. Settings → Claude Code helper → **Connect**. It should say *Connected* and, under Claude summaries, *Team plan · … — summaries allowed*.
+  4. Optionally tick *Keep the GitHub and Jenkins tokens in the macOS Keychain* → Save.
+- **Updating:** unzip over the same folder, reload the card at `chrome://extensions`, and re-run the helper's install command (Settings says when it's out of date).
 
 ## Install
 

@@ -80,4 +80,4 @@ if [ "${2:-}" = "--hook" ]; then
   edit_hook add
   echo "Claude Code hook added to $settings (backup: $settings.pr-tracker.bak). New sessions pick it up."
 fi
-echo "In PR Tracker: Settings → Claude Code sessions → Connect, then Refresh."
+echo "In PR Tracker: Settings → Claude Code helper → Connect, then Refresh."

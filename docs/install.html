@@ -43,6 +43,9 @@
     padding-block: 40px 72px;
   }
   .wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 48px; }
+  /* Long commands scroll inside their box, never the page. */
+  .wrap > *, ol.steps .detail, .copy { min-width: 0; }
+  ol.steps .detail { grid-template-columns: minmax(0, 1fr); }
   a { color: var(--accent); text-underline-offset: 3px; }
   a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   code, kbd { font-family: var(--mono); font-size: .88em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
@@ -89,7 +92,7 @@
   ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; display: grid; gap: 0; }
   ol.steps > li {
     counter-increment: step;
-    display: grid; grid-template-columns: 40px 1fr; gap: 4px 16px;
+    display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 16px;
     padding-block: 18px; border-top: 1px solid var(--rule);
   }
   ol.steps > li:last-child { border-bottom: 1px solid var(--rule); }
@@ -102,6 +105,7 @@
     background: var(--accent-soft); color: var(--accent);
   }
   ol.steps .detail { display: grid; gap: 10px; color: var(--muted); }
+  h3.group { font-size: 15px; margin: 20px 0 6px; }
   ol.steps .detail p { color: var(--muted); }
 
   .copy {
@@ -109,7 +113,7 @@
     background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
     padding: 6px 6px 6px 12px; font: 500 .92rem/1 var(--mono); color: var(--ink);
   }
-  .copy span { overflow-x: auto; white-space: nowrap; }
+  .copy span { overflow-x: auto; white-space: nowrap; min-width: 0; }
   .copy button {
     font: 500 .8rem/1 var(--body); cursor: pointer;
     background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px;
@@ -135,7 +139,7 @@
 
   @media (max-width: 480px) {
     body { padding-block: 24px 48px; }
-    ol.steps > li { grid-template-columns: 32px 1fr; gap: 4px 12px; }
+    ol.steps > li { grid-template-columns: 32px minmax(0, 1fr); gap: 4px 12px; }
   }
 </style>
 
@@ -241,30 +245,56 @@
     </ol>
     <div class="note">
       <p><strong>Only gdncomm repos appear.</strong> A fine-grained token covers a single owner, so PRs in personal or other orgs' repos aren't shown. That's intended.</p>
-      <p style="margin-top:8px"><strong>Your token stays on your computer.</strong> It's saved in this Chrome profile's extension storage and sent only to <code>api.github.com</code>. There's no server in between. The extension only reads from GitHub. It never comments, approves or pushes.</p>
+      <p style="margin-top:8px"><strong>Your token stays on your computer.</strong> It's saved in this Chrome profile's extension storage (or your macOS Keychain, step 13) and sent only to <code>api.github.com</code>. There's no server in between. The extension only reads from GitHub. It never comments, approves or pushes.</p>
     </div>
   </section>
 
   <section aria-labelledby="extras">
-    <h2 id="extras">Optional extras</h2>
-    <p class="muted">Everything above works without these. Each is set up in Settings and stays in this browser.</p>
-    <div class="facts">
-      <div class="fact">
-        <h3>Jenkins pass/fail</h3>
-        <p>GitHub hides Jenkins builds from fine-grained tokens. Add your <strong>Jenkins user ID and API token</strong> (Jenkins → your name → Security / Configure → API Token → <em>Add new token</em>) and accept Chrome's prompt for Jenkins access. PR Tracker then reads each PR's last build, read-only.</p>
-      </div>
-      <div class="fact">
-        <h3>Claude summaries</h3>
-        <p>Click <strong>Summarize with Claude</strong> on a PR and Claude judges each comment fixed / not fixed / no action and writes one line on what still blocks it. It's asked only when you click — never on a refresh — and the answer is kept, marked outdated once the PR changes. Default model Sonnet 5.</p>
-        <p>It runs through <strong>Claude Code on this Mac</strong> — your Claude subscription, no API key — so it needs the Claude Code helper (next card). Each summary runs <code>claude -p</code> with no tools, about 15–20 seconds, and counts toward your plan's usage. It works only when Claude Code is signed in with your company's <strong>Team or Enterprise</strong> plan; with a personal plan nothing is sent, and Settings says how to switch.</p>
-        <p class="muted">Comment text, file paths and commit messages go to Anthropic. Check that's allowed for your repos.</p>
-      </div>
-      <div class="fact">
-        <h3>Claude Code sessions</h3>
-        <p>Links each PR to the Claude Code sessions on your Mac that reviewed or discussed it, with a copyable <code>claude --resume</code> command, and runs summaries on your subscription. Needs a small local helper and Node.js. From the unzipped folder, run the command shown in Settings:</p>
-        <p><code>sh native/install.sh &lt;extension-id&gt; --hook</code></p>
-        <p>then Settings → Claude Code helper → <strong>Connect</strong>. Once connected, you can also tick <em>Keep the GitHub and Jenkins tokens in the macOS Keychain</em>, so they're no longer in Chrome's storage. <code>--hook</code> also marks reviews you post with Claude Code so teammates can see where they came from. <code>--uninstall</code> removes it.</p>
-      </div>
+    <h2 id="extras">Optional setup</h2>
+    <p class="muted">Everything above works without these. Do only the parts you want; each is in Settings (the <strong>Settings</strong> button at the top of PR Tracker).</p>
+
+    <h3 class="group">Jenkins pass/fail</h3>
+    <ol class="steps" style="counter-reset: step 7">
+      <li>
+        <h3>Create a Jenkins API token</h3>
+        <div class="detail"><p>GitHub hides Jenkins builds from fine-grained tokens, so PR Tracker asks Jenkins itself. In Jenkins, click your name (top right) → <strong>Security</strong> (or <strong>Configure</strong>) → <strong>API Token</strong> → <strong>Add new token</strong>, and copy it. Your user ID is shown on the same page.</p></div>
+      </li>
+      <li>
+        <h3>Add it in Settings</h3>
+        <div class="detail"><p>Fill in <strong>Jenkins user ID</strong> and <strong>API token</strong>, click <strong>Save</strong>, and accept Chrome's prompt to access <code>*.gdn-app.com</code>. Each PR then shows its last build, found in whichever team folder holds the repo. The token has your Jenkins rights, but PR Tracker only reads with it.</p></div>
+      </li>
+    </ol>
+
+    <h3 class="group">Claude Code helper: sessions, summaries, Keychain</h3>
+    <p class="muted">A small program on your Mac that the extension talks to. It links PRs to your Claude Code sessions, runs Claude summaries on your company plan, and can keep your tokens in the Keychain. Needs Node.js and Claude Code.</p>
+    <ol class="steps" style="counter-reset: step 9">
+      <li>
+        <h3>Check Claude Code is on your company plan</h3>
+        <div class="detail">
+          <p>Summaries only run under a <strong>Team</strong> or <strong>Enterprise</strong> plan; a personal plan is refused and nothing is sent. In Terminal:</p>
+          <span class="copy"><span id="c-auth">claude auth status --text</span><button type="button" data-copy="c-auth">Copy</button></span>
+          <p>If it shows a Pro or Max plan, run <code>claude</code>, then <code>/logout</code> and <code>/login</code> with your company email. Skip this if you only want session links or the Keychain.</p>
+        </div>
+      </li>
+      <li>
+        <h3>Install the helper</h3>
+        <div class="detail">
+          <p>Open Settings → <strong>Claude Code helper</strong> and copy the install command shown there; it already has your extension id. Run it in Terminal from the PR Tracker folder:</p>
+          <span class="copy"><span id="c-helper">cd ~/chrome-extensions/pr-tracker &amp;&amp; sh native/install.sh &lt;extension-id&gt; --hook</span><button type="button" data-copy="c-helper">Copy</button></span>
+          <p><code>--hook</code> is optional: it marks reviews you post with Claude Code (a hidden line), so PR Tracker can link them back to the session. <code>sh native/install.sh --uninstall</code> removes everything.</p>
+        </div>
+      </li>
+      <li>
+        <h3>Click Connect</h3>
+        <div class="detail"><p>In Settings → Claude Code helper, click <strong>Connect</strong> and allow Chrome's prompt. It should say <em>Connected</em>, and under Claude summaries: <em>Claude Code account: Team plan · … — summaries allowed</em>. PR cards now show <strong>Summarize with Claude</strong> and a <strong>Claude Code · n</strong> chip when a session touched the PR.</p></div>
+      </li>
+      <li>
+        <h3>Optional: keep your tokens in the Keychain</h3>
+        <div class="detail"><p>Tick <strong>Keep the GitHub and Jenkins tokens in the macOS Keychain</strong> and click <strong>Save</strong>. They move out of Chrome's storage into your login Keychain (search <code>com.gdncomm.pr-tracker</code> in Keychain Access). Untick to move them back.</p></div>
+      </li>
+    </ol>
+    <div class="note">
+      <p><strong>Summarize</strong> runs only when you click it, never on a refresh, and takes about 15–20 seconds. It sends that PR's comments, replies, file paths and commit messages to Anthropic under your company plan, with Claude Code's tools switched off. The answer stays on the card, marked <em>Outdated</em> once the PR changes.</p>
     </div>
   </section>
 
@@ -281,7 +311,20 @@
 
   <section aria-labelledby="update">
     <h2 id="update">Updating to a new version</h2>
-    <p>Download the new zip and unzip it <em>over the same folder</em>, replacing the old files. Then click the reload arrow on the PR Tracker card at <code>chrome://extensions</code>. Keeping the same folder keeps your token and settings. A new folder counts as a new extension and starts empty.</p>
+    <ol class="steps">
+      <li>
+        <h3>Unzip over the same folder</h3>
+        <div class="detail"><p>Replace the old files in place. Keeping the same folder keeps your token, settings and extension id; a new folder counts as a new extension and starts empty.</p></div>
+      </li>
+      <li>
+        <h3>Reload it</h3>
+        <div class="detail"><p>At <code>chrome://extensions</code>, click the reload arrow on the PR Tracker card. If Chrome asks about changed permissions, accept.</p></div>
+      </li>
+      <li>
+        <h3>If you use the helper, re-run its install command</h3>
+        <div class="detail"><p>Same command as step 11 (it's safe to repeat). Settings tells you when the helper is out of date: summaries stay off until it's updated.</p></div>
+      </li>
+    </ol>
   </section>
 
   <section aria-labelledby="trouble">

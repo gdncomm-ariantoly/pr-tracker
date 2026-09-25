@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it } from 'node:test'
@@ -215,26 +215,33 @@ describe('install.sh', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-tracker-install-'))
     const env = { ...process.env, PR_TRACKER_HOSTS_DIR: path.join(dir, 'hosts'), CLAUDE_SETTINGS: path.join(dir, 'settings.json') }
     const extId = 'abcdefghijklmnopabcdefghijklmnop'
+    // Run a copy: install.sh writes and --uninstall deletes native/host-run.sh next to
+    // itself, and a real install from this folder must survive the test suite.
+    const native = path.join(dir, 'native')
+    cpSync(path.join(ROOT, 'native'), native, { recursive: true, filter: (src) => !src.endsWith('host-run.sh') })
+    const install = path.join(native, 'install.sh')
+    const before = existsSync(path.join(ROOT, 'native/host-run.sh')) ? readFileSync(path.join(ROOT, 'native/host-run.sh'), 'utf8') : null
     try {
       writeFileSync(env.CLAUDE_SETTINGS, JSON.stringify({ model: 'x', hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'mine.sh' }] }] } }))
-      execFileSync('sh', [path.join(ROOT, 'native/install.sh'), extId, '--hook'], { env, stdio: 'pipe' })
-      execFileSync('sh', [path.join(ROOT, 'native/install.sh'), extId, '--hook'], { env, stdio: 'pipe' }) // twice: still one hook
+      execFileSync('sh', [install, extId, '--hook'], { env, stdio: 'pipe' })
+      execFileSync('sh', [install, extId, '--hook'], { env, stdio: 'pipe' }) // twice: still one hook
       const host = JSON.parse(readFileSync(path.join(env.PR_TRACKER_HOSTS_DIR, 'com.gdncomm.pr_tracker.json'), 'utf8'))
       assert.deepEqual(host.allowed_origins, [`chrome-extension://${extId}/`])
-      assert.equal(host.path, path.join(ROOT, 'native/host-run.sh'))
+      assert.equal(host.path, path.join(native, 'host-run.sh'))
       const settings = JSON.parse(readFileSync(env.CLAUDE_SETTINGS, 'utf8'))
       assert.equal(settings.model, 'x')
       const commands = settings.hooks.PreToolUse.flatMap((/** @type {any} */ g) => g.hooks.map((/** @type {any} */ h) => h.command))
       assert.equal(commands.filter((/** @type {string} */ c) => c.includes('claude-code-hook.mjs')).length, 1)
       assert.ok(commands.includes('mine.sh'), "the user's own hook stays")
 
-      execFileSync('sh', [path.join(ROOT, 'native/install.sh'), '--uninstall'], { env, stdio: 'pipe' })
+      execFileSync('sh', [install, '--uninstall'], { env, stdio: 'pipe' })
       const after = JSON.parse(readFileSync(env.CLAUDE_SETTINGS, 'utf8'))
       assert.deepEqual(after, { model: 'x', hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'mine.sh' }] }] } })
-      assert.throws(() => execFileSync('sh', [path.join(ROOT, 'native/install.sh'), 'bad-id'], { env, stdio: 'pipe' }))
+      assert.throws(() => execFileSync('sh', [install, 'bad-id'], { env, stdio: 'pipe' }))
+      const now = existsSync(path.join(ROOT, 'native/host-run.sh')) ? readFileSync(path.join(ROOT, 'native/host-run.sh'), 'utf8') : null
+      assert.equal(now, before, "the real install's launcher is untouched")
     } finally {
       rmSync(dir, { recursive: true, force: true })
-      rmSync(path.join(ROOT, 'native/host-run.sh'), { force: true })
     }
   })
 })
