@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { basicAuth, fetchJenkinsBuild, mapLimit, parseLastBuild } from '../lib/jenkins.js'
+import { basicAuth, fetchJenkinsBuild, mapLimit, parseFolders, parseLastBuild } from '../lib/jenkins.js'
 import { addJenkinsBuilds } from '../lib/refresh.js'
 
 const JOB = 'https://jenkins-build-ci-2.gdn-app.com/job/GitHub/job/gdncomm/job/GDN/job/TRFCEE/job/product-feed/job/PR-152/'
@@ -57,49 +57,73 @@ describe('fetchJenkinsBuild', () => {
 
 describe('addJenkinsBuilds', () => {
   const pr = (/** @type {string} */ id, /** @type {string} */ repo, /** @type {any} */ build = null) => /** @type {any} */ ({ id, repo, number: 7, build })
-  const TEMPLATE = 'https://jenkins-build-ci-2.gdn-app.com/job/T/job/{repo}/job/PR-{number}/'
-
+  const TEMPLATE = 'https://jenkins-build-ci-2.gdn-app.com/job/GDN/job/{folder}/job/{repo}/job/PR-{number}/'
   const AUTH = { user: 'u', token: 't' }
+  const memory = () => {
+    /** @type {Record<string, unknown>} */ const data = {}
+    return { data, get: async (/** @type {string} */ k) => ({ [k]: data[k] }), set: async (/** @type {Record<string, unknown>} */ o) => void Object.assign(data, o) }
+  }
+  // Team folders as Jenkins lists them: svc in TRFCEE, seo in SEO, shared in both (only SEO builds it).
+  const LISTING = { jobs: [{ name: 'TRFCEE', jobs: [{ name: 'svc' }, { name: 'locked' }, { name: 'shared' }] }, { name: 'SEO', jobs: [{ name: 'seo' }, { name: 'shared' }] }] }
+  /** @param {string[]} asked */
+  const jenkins = (asked) => /** @type {typeof fetch} */ (async (url) => {
+    const u = String(url)
+    asked.push(u)
+    if (u.includes('/api/json?tree=jobs')) return new Response(JSON.stringify(LISTING), { status: 200 })
+    if (u.includes('/job/locked/')) return new Response('', { status: 401 })
+    if (u.includes('/TRFCEE/job/shared/')) return new Response('', { status: 404 })
+    return new Response(JSON.stringify({ number: 5, result: 'FAILURE' }), { status: 200 })
+  })
+
+  it('parses the folder listing, keeping repos that sit in several folders', () => {
+    assert.deepEqual(parseFolders(LISTING), { svc: ['TRFCEE'], locked: ['TRFCEE'], shared: ['TRFCEE', 'SEO'], seo: ['SEO'] })
+    assert.deepEqual(parseFolders(null), {})
+  })
+
   it('does nothing without a token, or until Chrome grants access', async () => {
+    /** @type {string[]} */ const asked = []
     const snap = /** @type {any} */ ({ mine: [pr('A', 'o/svc')], toReview: [] })
-    const ok = reply(200, { number: 1, result: 'SUCCESS' })
-    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: ok, jenkinsAllowed: async () => true }, null)
-    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: ok, jenkinsAllowed: async () => false }, AUTH)
-    assert.equal(snap.mine[0].build, null)
+    await addJenkinsBuilds(snap, TEMPLATE, { area: memory(), jenkinsFetch: jenkins(asked), jenkinsAllowed: async () => true }, null)
+    await addJenkinsBuilds(snap, TEMPLATE, { area: memory(), jenkinsFetch: jenkins(asked), jenkinsAllowed: async () => false }, AUTH)
+    assert.deepEqual(asked, [])
     assert.equal(snap.jenkinsChecked, undefined)
   })
 
-  it('fills builds GitHub lacked, once per PR, and flags a rejected token', async () => {
+  it("looks each PR up in its repo's own team folder, once per PR", async () => {
     /** @type {string[]} */ const asked = []
-    const f = /** @type {typeof fetch} */ (async (url) => {
-      asked.push(String(url))
-      if (String(url).includes('/job/locked/')) return new Response('', { status: 401 })
-      if (String(url).includes('/job/deploy/')) return new Response('', { status: 404 })
-      return new Response(JSON.stringify({ number: 5, result: 'FAILURE' }), { status: 200 })
-    })
     const both = pr('A', 'o/svc')
     const snap = /** @type {any} */ ({
-      mine: [both, pr('B', 'o/locked'), pr('C', 'o/deploy'), pr('D', 'o/svc', { state: 'success' })],
+      mine: [both, pr('S', 'gdncomm/seo'), pr('X', 'o/shared'), pr('N', 'o/unknown'), pr('D', 'o/svc', { state: 'success' })],
       toReview: [{ ...both }],
     })
-    let origin = ''
-    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: f, jenkinsAllowed: async (o) => ((origin = o), true) }, AUTH)
-    assert.equal(origin, 'https://jenkins-build-ci-2.gdn-app.com')
-    assert.equal(asked.length, 3, 'A once (though in both lists), B, C; D already had a build')
+    const area = memory()
+    await addJenkinsBuilds(snap, TEMPLATE, { area, jenkinsFetch: jenkins(asked), jenkinsAllowed: async () => true }, AUTH)
+    const builds = asked.filter((u) => u.includes('lastBuild'))
+    assert.ok(builds.some((u) => u.includes('/job/TRFCEE/job/svc/job/PR-7/')))
+    assert.ok(builds.some((u) => u.includes('/job/SEO/job/seo/job/PR-7/')), 'SEO repo looked up under SEO, not TRFCEE')
+    assert.equal(builds.filter((u) => u.includes('/job/svc/')).length, 1, 'A once, though in both lists; D already had a build')
+    assert.ok(!builds.some((u) => u.includes('/unknown/')), 'a repo in no folder is not guessed')
     assert.equal(snap.mine[0].build.state, 'failure')
     assert.equal(snap.toReview[0].build.state, 'failure')
-    assert.equal(snap.mine[1].build, null)
-    assert.equal(snap.mine[2].build, null)
-    assert.equal(snap.jenkinsBadToken, true)
+    assert.equal(snap.mine[1].build.state, 'failure')
+    assert.ok(builds.some((u) => u.includes('/TRFCEE/job/shared/')) && builds.some((u) => u.includes('/SEO/job/shared/')), 'a repo in two folders: tried in both')
+    assert.equal(snap.mine[2].build.state, 'failure', 'the folder that has the build wins')
+    assert.equal(snap.mine[3].build, null)
+
+    // The folder map is cached: the next refresh doesn't list folders again.
+    const listed = asked.filter((u) => u.includes('tree=jobs')).length
+    await addJenkinsBuilds(/** @type {any} */ ({ mine: [pr('A', 'o/svc')], toReview: [] }), TEMPLATE, { area, jenkinsFetch: jenkins(asked), jenkinsAllowed: async () => true }, AUTH)
+    assert.equal(asked.filter((u) => u.includes('tree=jobs')).length, listed)
   })
 
-  it('never asks Jenkins about cucumber-* automation repos', async () => {
-    /** @type {string[]} */ const asked = []
-    const f = /** @type {typeof fetch} */ (async (url) => (asked.push(String(url)), new Response(JSON.stringify({ number: 1, result: 'SUCCESS' }))))
-    const snap = /** @type {any} */ ({ mine: [pr('A', 'gdncomm/cucumber-seo-backend')], toReview: [] })
-    await addJenkinsBuilds(snap, TEMPLATE, { jenkinsFetch: f, jenkinsAllowed: async () => true }, AUTH)
-    assert.deepEqual(asked, [])
-    assert.equal(snap.mine[0].build, null)
+  it('flags a rejected token', async () => {
+    const snap = /** @type {any} */ ({ mine: [pr('B', 'o/locked')], toReview: [] })
+    await addJenkinsBuilds(snap, TEMPLATE, { area: memory(), jenkinsFetch: jenkins([]), jenkinsAllowed: async () => true }, AUTH)
+    assert.equal(snap.jenkinsBadToken, true)
+    const listing401 = /** @type {typeof fetch} */ (async () => new Response('', { status: 401 }))
+    const snap2 = /** @type {any} */ ({ mine: [pr('A', 'o/svc')], toReview: [] })
+    await addJenkinsBuilds(snap2, TEMPLATE, { area: memory(), jenkinsFetch: listing401, jenkinsAllowed: async () => true }, AUTH)
+    assert.equal(snap2.jenkinsBadToken, true)
   })
 })
 

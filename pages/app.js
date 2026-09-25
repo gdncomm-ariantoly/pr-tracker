@@ -8,7 +8,7 @@ import { JENKINS_HIDDEN } from '../lib/github.js'
 import { CLAUDE_ORIGIN } from '../lib/claude.js'
 import { resumeCommand } from '../lib/sessions.js'
 import { localSessions, nativeAllowed } from '../platform.js'
-import { deployJenkinsLink, JENKINS_TEMPLATE, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
+import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -438,8 +438,9 @@ function renderPR(pr, viewer, showRepo) {
   else if (state.jenkinsHidden && !state.snapshot?.jenkinsChecked) {
     // Only guess the job link when GitHub is hiding builds from the token; a PR
     // whose builds are visible but absent (deployment repos) has no job to link.
-    const job = jenkinsJobUrl(JENKINS_TEMPLATE, pr)
-    if (job) chips.append(jobChip(job))
+    // The team folder (TRFCEE, SEO, …) is only known with a Jenkins token: search for the repo instead.
+    const job = ciSearchLink(pr)
+    if (job) chips.append(jobChip(job, 'Jenkins ↗', 'Finds this repo\'s job on Jenkins (add a Jenkins token to see pass/fail)'))
   }
   if (pr.isDraft) chips.append(chip('Draft', 'c-draft'))
   if (state.tab === 'toReview') chips.append(pr.requested ? chip('Review requested', 'c-req') : pr.watched ? chip('Watched repo', 'c-watch') : chip('Reviewed by you', 'c-muted'))

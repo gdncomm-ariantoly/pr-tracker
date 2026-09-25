@@ -443,7 +443,7 @@ async function verify(context, id) {
   mode = 'jenkins-hidden'
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
-  const fallback = page.locator('a.chip.b-unknown:not([href*="/search/?q="])')
+  const fallback = page.locator('a.chip.b-unknown[href^="https://jenkins-build-ci-2.gdn-app.com/"]')
   const ciPRs = await page.evaluate(async () => {
     const { NO_CI_REPO, skipsJenkins } = await import('../lib/store.js')
     const tab = document.querySelector('[role=tab][aria-selected=true]')?.getAttribute('data-tab') ?? 'mine'
@@ -461,7 +461,7 @@ async function verify(context, id) {
   for (const id of cucumberIds) cucumberChips += await page.locator(`article.pr[data-id="${id}"] .chip.build`).count()
   check('cucumber-* automation PRs get no Jenkins chip or link', cucumberChips === 0, `${cucumberChips} on ${cucumberIds.length} PRs`)
   check('hidden build status falls back to a Jenkins job link on every CI PR (not prod/non-prod deploy repos)', (await fallback.count()) === ciPRs, `${await fallback.count()} vs ${ciPRs}`)
-  check('fallback link follows the job template', /\/job\/PR-\d+\/$/.test((await fallback.first().getAttribute('href')) ?? ''))
+  check('without a Jenkins token the team folder is unknown, so it links to Jenkins search, not a guessed folder', /^https:\/\/jenkins-build-ci-2\.gdn-app\.com\/search\/\?q=[\w.-]+$/.test((await fallback.first().getAttribute('href')) ?? ''), (await fallback.first().getAttribute('href')) ?? '')
   check('no banner for a hidden build status when the link covers it', await page.isHidden('#warning'))
   check('suggests adding a Jenkins token', await page.isVisible('#jenkins-access'))
   mode = 'ok'

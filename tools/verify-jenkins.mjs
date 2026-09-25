@@ -53,11 +53,21 @@ try {
   await context.route('https://api.github.com/graphql', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(github) }))
   // Build lookups are replayed. The good token sees every build; a bad one gets 401.
   /** @type {{auth: string}[]} */ const calls = []
+  /** @type {string[]} */ const buildUrls = []
   const GOOD = `Basic ${Buffer.from('ci.user:good').toString('base64')}`
+  // The team-folder listing: api lives in SEO, client-sdk in TRFCEE.
+  /** @type {string[]} */ const listings = []
+  await context.route(`${JENKINS}/job/GitHub/job/gdncomm/job/GDN/api/json*`, async (route) => {
+    const headers = await route.request().allHeaders()
+    listings.push(headers.authorization ?? '')
+    if (headers.authorization !== GOOD) return route.fulfill({ status: 401, body: 'Invalid password/token' })
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jobs: [{ name: 'SEO', jobs: [{ name: 'api' }] }, { name: 'TRFCEE', jobs: [{ name: 'client-sdk' }] }] }) })
+  })
   await context.route(`${JENKINS}/**/lastBuild/api/json*`, async (route) => {
     const url = route.request().url()
     const headers = await route.request().allHeaders()
     calls.push({ auth: headers.authorization ?? '' })
+    buildUrls.push(url)
     if (headers.authorization !== GOOD) return route.fulfill({ status: 401, body: 'Invalid password/token' })
     const json = (/** @type {object} */ b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
     if (url.includes('/PR-101/')) return json({ number: 12, result: 'SUCCESS', building: false, url: `${JENKINS}/job/x/job/PR-101/12/`, timestamp: Date.now() - 60_000, duration: 30_000 })
@@ -97,6 +107,8 @@ try {
   check('token field cleared, token kept', (await page.inputValue('#jenkins-token')) === '' && (await page.getAttribute('#jenkins-token', 'placeholder'))?.includes('saved') === true)
   check('passing build read from Jenkins', ((await chipOf(101).textContent()) ?? '') === 'Jenkins #12 passed', (await chipOf(101).textContent()) ?? '')
   check('chip links to that build', (await chipOf(101).getAttribute('href')) === `${JENKINS}/job/x/job/PR-101/12/`)
+  check('folders are listed once with the token', listings.length === 1 && listings[0] === GOOD, `${listings.length}`)
+  check('each PR is looked up in its repo\'s team folder (SEO, not TRFCEE)', buildUrls.some((u) => u.includes('/job/GDN/job/SEO/job/api/job/PR-101/')) && !buildUrls.some((u) => u.includes('/TRFCEE/job/api/')), buildUrls[0])
   check('no job (404) means no chip, not a dead link', (await page.locator('article.pr', { hasText: '#102 ' }).locator('.chip.build').count()) === 0)
   check('token banner gone once a token is set', await page.isHidden('#jenkins-access'))
   await page.click('#tab-toReview')

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it } from 'node:test'
 
-import { DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList, parseRepos, skipsJenkins } from '../lib/store.js'
+import { ciSearchLink, DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPLATE, normalise, parseList, parseRepos, skipsJenkins } from '../lib/store.js'
 
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
@@ -22,16 +22,22 @@ it('parses a comma/newline list', () => {
   assert.deepEqual(parseList('a, b\n c,,'), ['a', 'b', 'c'])
 })
 
-it('builds the Jenkins job link from the template', () => {
+it('builds the Jenkins job link in the repo\'s team folder', () => {
   assert.equal(
-    jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/product-feed', number: 152 }),
+    jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/product-feed', number: 152 }, 'TRFCEE'),
     'https://jenkins-build-ci-2.gdn-app.com/job/GitHub/job/gdncomm/job/GDN/job/TRFCEE/job/product-feed/job/PR-152/',
   )
-  assert.equal(jenkinsJobUrl('', { repo: 'o/r', number: 1 }), null)
+  assert.equal(
+    jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/seo-backend', number: 7 }, 'SEO'),
+    'https://jenkins-build-ci-2.gdn-app.com/job/GitHub/job/gdncomm/job/GDN/job/SEO/job/seo-backend/job/PR-7/',
+  )
+  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/seo-backend', number: 7 }, undefined), null, 'no folder: no guess')
+  assert.equal(jenkinsJobUrl('', { repo: 'o/r', number: 1 }, 'X'), null)
   // prod / non-prod Jenkins never report PR builds and aren't on the CI host
-  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/prod-deployment-gdn-product-feed', number: 33 }), null)
-  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/nonprod-rundeck-gdn-preprod', number: 46 }), null)
-  assert.notEqual(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/product-feed', number: 1 }), null)
+  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/prod-deployment-gdn-product-feed', number: 33 }, 'X'), null)
+  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/nonprod-rundeck-gdn-preprod', number: 46 }, 'X'), null)
+  assert.equal(ciSearchLink({ repo: 'gdncomm/seo-backend' }), 'https://jenkins-build-ci-2.gdn-app.com/search/?q=seo-backend')
+  assert.equal(ciSearchLink({ repo: 'gdncomm/prod-x' }), null)
 })
 
 it('links deployment repos to the Jenkins that runs them', () => {
@@ -46,5 +52,6 @@ it('links deployment repos to the Jenkins that runs them', () => {
 it('never looks up or links Jenkins for cucumber-* automation repos', () => {
   assert.equal(skipsJenkins({ repo: 'gdncomm/cucumber-seo-backend' }), true)
   assert.equal(skipsJenkins({ repo: 'gdncomm/seo-backend' }), false)
-  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/cucumber-seo-backend', number: 3 }), null)
+  assert.equal(jenkinsJobUrl(JENKINS_TEMPLATE, { repo: 'gdncomm/cucumber-seo-backend', number: 3 }, 'TRFCEE'), null)
+  assert.equal(ciSearchLink({ repo: 'gdncomm/cucumber-seo-backend' }), null)
 })
