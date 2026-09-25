@@ -69,7 +69,7 @@ try {
   const runner = path.join(work, 'host-run.sh')
   // A stand-in claude CLI for Summarize: prints a fixed judgement, records the prompt.
   const fakeClaude = path.join(work, 'claude-bin')
-  writeFileSync(fakeClaude, `#!/bin/sh\ncat > "${work}/claude-stdin"\nprintf '%s' '${JSON.stringify({ subtype: 'success', is_error: false, structured_output: { summary: 'Judged locally.', verdicts: [] } })}'\n`)
+  writeFileSync(fakeClaude, `#!/bin/sh\nif [ "$1" = auth ]; then printf '%s' '${JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', subscriptionType: 'team', orgName: 'acme' })}'; exit 0; fi\ncat > "${work}/claude-stdin"\nprintf '%s' '${JSON.stringify({ subtype: 'success', is_error: false, structured_output: { summary: 'Judged locally.', verdicts: [] } })}'\n`)
   chmodSync(fakeClaude, 0o755)
   // A throwaway Keychain service, so the real PR Tracker items are never touched.
   writeFileSync(runner, `#!/bin/sh\nexport PR_TRACKER_CLAUDE="${fakeClaude}"\nexport PR_TRACKER_KEYCHAIN_SERVICE="${KEYCHAIN_TEST}"\nexport HOME="${homedir()}"\nexport PR_TRACKER_CACHE="${path.join(work, 'cache.json')}"\nexec "${process.execPath}" "${path.join(ext, 'native/host.mjs')}" "$@"\n`)

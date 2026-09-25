@@ -16,7 +16,11 @@ export const nativeAllowed = () => chrome.permissions.contains({ permissions: ['
  * the user's own Claude subscription (see native/host.mjs).
  */
 export const claudeCode = {
-  allowed: async () => (await nativeAllowed()) && !!chrome.runtime.sendNativeMessage,
+  // Helper v4+ refuses personal plans itself; an older one doesn't, so it isn't used.
+  allowed: async () => {
+    const info = await helperInfo().catch(() => null)
+    return !!info?.ok && (info.version ?? 0) >= SUMMARY_HELPER && !!info.account?.ok
+  },
   ask: (/** @type {object} */ request) => chrome.runtime.sendNativeMessage(NATIVE_HOST, request),
 }
 
@@ -47,10 +51,13 @@ async function keychainCall(request) {
   return answer
 }
 
+/** The first helper version that checks the Claude account before sending anything. */
+export const SUMMARY_HELPER = 4
+
 /** The helper's ping: its version and whether it found the claude CLI. null when not connected. */
 export async function helperInfo() {
-  if (!(await claudeCode.allowed())) return null
-  return /** @type {{ok: boolean, version?: number, claude?: boolean, keychain?: boolean}} */ (await chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'ping' }))
+  if (!(await nativeAllowed()) || !chrome.runtime.sendNativeMessage) return null
+  return /** @type {{ok: boolean, version?: number, claude?: boolean, keychain?: boolean, account?: {ok: true, label: string} | {ok: false, reason: string}}} */ (await chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'ping' }))
 }
 
 /**

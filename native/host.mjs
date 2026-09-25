@@ -5,7 +5,9 @@
  *     returns transcript content, only session metadata (see scan.mjs).
  *   - "judge this PR's comments": runs Claude Code headless (`claude -p`) on
  *     the user's own subscription, with every tool switched off, no settings,
- *     no MCP servers and no saved session — text in, JSON out.
+ *     no MCP servers and no saved session — text in, JSON out. Only when
+ *     Claude Code is signed in under a company plan (Team / Enterprise, or
+ *     Bedrock / Vertex): a personal plan is refused before anything is sent.
  *   - optionally, keep the GitHub and Jenkins tokens in the macOS Keychain
  *     instead of Chrome's storage (`security`; the secret goes in on stdin,
  *     never in a process's arguments).
@@ -19,7 +21,7 @@
  *   → {type: 'secret-set', name: 'github' | 'jenkins', value}  ← {ok: true}
  *   → {type: 'secret-get', name}  ← {ok: true, value}   (value '' when there is none)
  *   → {type: 'secret-delete', name}  ← {ok: true}
- *   → {type: 'ping'}  ← {ok: true, version: 3, claude: <found the claude CLI?>, keychain: true}
+ *   → {type: 'ping'}  ← {ok: true, version: 4, claude: <found the claude CLI?>, keychain: true, account: {ok, label} | {ok: false, reason}}
  */
 
 import { spawn } from 'node:child_process'
@@ -35,7 +37,9 @@ const CACHE = process.env.PR_TRACKER_CACHE || path.join(homedir(), '.cache', 'pr
 /** PR Tracker's own repo: its sessions mention PRs as test data, not as work on them. */
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-export const VERSION = 3
+export const VERSION = 4
+/** Claude.ai plans that are a company's, not a person's. */
+export const COMPANY_PLANS = new Set(['team', 'enterprise'])
 /** Keychain item service; the account is the secret's name. */
 export const KEYCHAIN_SERVICE = 'com.gdncomm.pr-tracker'
 const SECRET_NAMES = new Set(['github', 'jenkins'])
@@ -63,6 +67,60 @@ export function findClaude(env = process.env) {
   return null
 }
 
+/**
+ * May PR content go to Claude under this login? From `claude auth status --json`.
+ * Company plans and a company cloud (Bedrock, Vertex, …) may; a personal plan,
+ * a signed-out CLI or a login we can't place may not.
+ *
+ * @param {any} status
+ * @returns {{ok: true, label: string} | {ok: false, reason: string}}
+ */
+export function accountPolicy(status) {
+  const fix = 'In a terminal run claude, then /logout and /login with your company account.'
+  if (!status || status.loggedIn !== true) return { ok: false, reason: `Claude Code isn't signed in. ${fix}` }
+  if (typeof status.apiProvider === 'string' && status.apiProvider !== 'firstParty') return { ok: true, label: `${status.apiProvider} (your company's cloud)` }
+  const plan = typeof status.subscriptionType === 'string' ? status.subscriptionType.toLowerCase() : ''
+  const org = typeof status.orgName === 'string' && status.orgName ? ` · ${status.orgName}` : ''
+  if (COMPANY_PLANS.has(plan)) return { ok: true, label: `${plan[0].toUpperCase()}${plan.slice(1)} plan${org}` }
+  const what = plan ? `a personal ${plan[0].toUpperCase()}${plan.slice(1)} plan` : status.authMethod === 'claude.ai' ? 'an account without a Team or Enterprise plan' : "an API key PR Tracker can't tell is your company's"
+  return { ok: false, reason: `Claude Code is signed in with ${what}${org}. PR Tracker only sends PR content to Claude under a company Team or Enterprise plan (or Bedrock / Vertex). ${fix}` }
+}
+
+/** @param {string | null} bin */
+export async function claudeAccount(bin = findClaude()) {
+  if (!bin) return /** @type {const} */ ({ ok: false, reason: "The claude command wasn't found — re-run native/install.sh from a terminal where claude works." })
+  const r = await run(bin, ['auth', 'status', '--json'], '', 20_000)
+  /** @type {any} */ let status = null
+  try {
+    status = JSON.parse(r.stdout)
+  } catch {
+    // unreadable: refused below
+  }
+  return accountPolicy(status)
+}
+
+/**
+ * @param {string} bin @param {string[]} args @param {string} input @param {number} timeoutMs
+ * @returns {Promise<{code: number | null, signal: string | null, stdout: string, stderr: string}>}
+ */
+function run(bin, args, input, timeoutMs) {
+  return new Promise((resolve) => {
+    // A scratch directory: no project CLAUDE.md or settings get picked up.
+    const child = spawn(bin, args, { cwd: tmpdir(), stdio: ['pipe', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs)
+    child.stdout.on('data', (d) => (stdout += d))
+    child.stderr.on('data', (d) => (stderr += d))
+    child.on('error', (e) => resolve({ code: -1, signal: null, stdout, stderr: String(e) }))
+    child.on('close', (code, signal) => {
+      clearTimeout(timer)
+      resolve({ code, signal, stdout, stderr })
+    })
+    child.stdin.end(input)
+  })
+}
+
 /** The `claude -p` arguments for one judgement: no tools, settings, MCP or saved session. */
 export function judgeArgs(/** @type {{model: string, system: string, schema: object}} */ r) {
   return ['-p', '--output-format', 'json', '--json-schema', JSON.stringify(r.schema), '--model', r.model, '--system-prompt', r.system, '--tools', '', '--setting-sources', '', '--strict-mcp-config', '--no-session-persistence']
@@ -79,22 +137,10 @@ export async function judge(request, bin = findClaude()) {
   if (typeof system !== 'string' || typeof prompt !== 'string' || !schema || typeof schema !== 'object') return { ok: false, error: 'bad request' }
   if (prompt.length > 1_000_000) return { ok: false, error: 'PR too large to judge' }
   if (!bin) return { ok: false, error: "the claude command wasn't found — re-run native/install.sh from a terminal where `claude` works" }
-  const out = await new Promise((resolve) => {
-    // A scratch directory: no project CLAUDE.md or settings get picked up.
-    const child = spawn(bin, judgeArgs({ model, system, schema }), { cwd: tmpdir(), stdio: ['pipe', 'pipe', 'pipe'] })
-    let stdout = ''
-    let stderr = ''
-    const timer = setTimeout(() => child.kill('SIGTERM'), JUDGE_TIMEOUT_MS)
-    child.stdout.on('data', (d) => (stdout += d))
-    child.stderr.on('data', (d) => (stderr += d))
-    child.on('error', (e) => resolve({ code: -1, stdout, stderr: String(e) }))
-    child.on('close', (code, signal) => {
-      clearTimeout(timer)
-      resolve({ code, signal, stdout, stderr })
-    })
-    child.stdin.end(prompt)
-  })
-  const { code, signal, stdout, stderr } = /** @type {{code: number, signal?: string, stdout: string, stderr: string}} */ (out)
+  // Checked on every run, here in the helper: the page can't skip it.
+  const account = await claudeAccount(bin)
+  if (!account.ok) return { ok: false, error: account.reason }
+  const { code, signal, stdout, stderr } = await run(bin, judgeArgs({ model, system, schema }), prompt, JUDGE_TIMEOUT_MS)
   if (signal) return { ok: false, error: 'Claude Code took too long' }
   /** @type {any} */ let json = null
   try {
@@ -168,7 +214,7 @@ function send(message) {
 
 /** @param {any} request */
 export function handle(request, root = ROOT, cacheFile = CACHE) {
-  if (request?.type === 'ping') return { ok: true, version: VERSION, claude: !!findClaude(), keychain: true }
+  if (request?.type === 'ping') return claudeAccount().then((account) => ({ ok: true, version: VERSION, claude: !!findClaude(), keychain: true, account }))
   if (/^secret-(?:get|set|delete)$/.test(String(request?.type))) return secret(request)
   if (request?.type === 'judge') return judge(request)
   if (request?.type !== 'sessions' || !Array.isArray(request.prs)) return { ok: false, error: 'unknown request' }

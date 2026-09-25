@@ -67,6 +67,7 @@
           </select>
         </span>
         <label class="check"><input type="checkbox" id="claude-auto" /> <span>Ask automatically on refresh, for PRs whose comments, replies or commits changed. Off: only when you click <em>Summarize with Claude</em> on a PR.</span></label>
+        <small id="claude-account" class="muted"></small>
         <small class="muted">Claude decides fixed / not fixed / no action for each comment and writes a one-line summary per PR, reused until the PR changes. It runs through Claude Code on this Mac — the <code>claude</code> command you're signed in to — via the Claude Code helper below, so connect that first. No tools, no settings, no saved session; it counts toward your Claude plan's usage. Comment text, file paths and commit messages go to Anthropic: check that's allowed for your repos.</small>
       </div>
       <div class="cc-setup">

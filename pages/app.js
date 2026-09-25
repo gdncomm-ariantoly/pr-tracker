@@ -6,7 +6,7 @@ import { judgeOnePR, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { resumeCommand } from '../lib/sessions.js'
-import { claudeCode, helperInfo, localSessions, nativeAllowed, secrets } from '../platform.js'
+import { claudeCode, helperInfo, localSessions, nativeAllowed, secrets, SUMMARY_HELPER } from '../platform.js'
 import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, KEYCHAIN_REF, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
@@ -824,6 +824,22 @@ async function paintClaudeCode() {
   status.textContent = cc?.state === 'error' ? `Connected, but the helper didn't answer: ${cc.message}. Is it installed?` : cc?.state === 'ok' ? 'Connected — sessions are looked up on every refresh.' : 'Connected — sessions show after the next refresh.'
   if (cc?.state === 'error') return
   const info = await helperInfo().catch(() => null)
+  // Summaries need a company Claude plan; the helper refuses otherwise, so don't offer them.
+  const account = $('claude-account')
+  const current = !!info?.ok && (info.version ?? 0) >= SUMMARY_HELPER
+  const allowed = current && !!info?.account?.ok
+  account.textContent = !info?.ok
+    ? ''
+    : !current
+      ? 'Summaries are off until you update the helper: re-run the install command below from the new folder (it now checks that Claude Code uses a company plan).'
+      : info.account?.ok
+        ? `Claude Code account: ${info.account.label} — summaries allowed.`
+        : `Summaries are off: ${info.account && 'reason' in info.account ? info.account.reason : 'unknown account'}`
+  account.classList.toggle('bad', !!info?.ok && !allowed)
+  if (state.claudeReady !== allowed) {
+    state.claudeReady = allowed
+    paint()
+  }
   // The Keychain needs helper v3; keep the box usable to untick it whatever happens.
   const box = input('keychain')
   box.disabled = !(info?.ok && info.keychain) && !box.checked
@@ -835,7 +851,7 @@ async function paintClaudeCode() {
 $('cc-connect').addEventListener('click', async () => {
   // Synchronous inside the click: Chrome only shows the prompt for a user gesture.
   const granted = await chrome.permissions.request({ permissions: ['nativeMessaging'] }).catch(() => false)
-  state.claudeReady = !!granted
+  state.claudeReady = !!granted && (await claudeCode.allowed().catch(() => false))
   if (granted) await doRefresh()
   await paintClaudeCode()
 })
@@ -942,8 +958,8 @@ async function init() {
   input('claude-auto').checked = settings.claudeAuto
   input('keychain').checked = settings.keychain
   if (settings.keychain) input('keychain').disabled = false
-  // Summarize is offered once the Claude Code helper is connected.
-  state.claudeReady = await nativeAllowed()
+  // Summarize is offered once the helper is connected and the Claude account is a company one.
+  state.claudeReady = await claudeCode.allowed().catch(() => false)
   if (settings.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)
   state.jenkinsGranted = origin ? await jenkinsAllowed(origin) : false

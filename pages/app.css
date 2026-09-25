@@ -69,6 +69,7 @@ button:disabled { opacity: .6; cursor: default; }
 .settings label.check small { flex-basis: 100%; }
 .settings label.check > span { flex: 1; min-width: 0; font-weight: 400; }
 .settings label.inline { display: inline; font-weight: 400; }
+.settings small.bad { color: var(--bad-fg); }
 .settings input, .settings textarea, .settings select {
   font: inherit; padding: 6px 8px; border-radius: 6px;
   border: 1px solid var(--line); background: var(--bg); color: var(--fg);

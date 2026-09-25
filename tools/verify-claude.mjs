@@ -41,6 +41,10 @@ const fakeClaude = path.join(work, 'claude-bin')
 writeFileSync(fakeClaude, `#!${process.execPath}
 const fs = require('node:fs')
 const args = process.argv.slice(2)
+if (args[0] === 'auth') {
+  process.stdout.write(fs.readFileSync(${JSON.stringify(path.join(work, 'auth.json'))}, 'utf8'))
+  process.exit(0)
+}
 const prompt = fs.readFileSync(0, 'utf8')
 fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ model: args[args.indexOf('--model') + 1], tools: args[args.indexOf('--tools') + 1], prompt }) + '\\n')
 const ids = [...prompt.matchAll(/Comment id=(\\S+)/g)].map((m) => m[1])
@@ -48,6 +52,9 @@ const verdicts = ids.map((id, i) => ({ id, verdict: i === 0 ? 'unfixed' : 'fixed
 process.stdout.write(JSON.stringify({ subtype: 'success', is_error: false, structured_output: { summary: 'Claude summary: ' + ids.length + ' comments looked at.', verdicts } }))
 `)
 chmodSync(fakeClaude, 0o755)
+/** What `claude auth status` reports; the run switches it to a personal plan later. @param {string} plan */
+const signIn = (plan) => writeFileSync(path.join(work, 'auth.json'), JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', subscriptionType: plan, orgName: plan === 'team' ? 'acme' : undefined }))
+signIn('team')
 /** @returns {{model: string, tools: string, prompt: string}[]} */
 const runs = () => (existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
 const fixture = readFileSync(path.join(ROOT, 'tests/fixtures/dashboard.json'), 'utf8')
@@ -139,6 +146,18 @@ try {
   await settled()
   check('nothing changed: no new Claude runs on refresh', runs().length === before, `${runs().length - before} new`)
 
+
+  // Signed in with a personal plan: nothing goes to Claude, and Settings says why.
+  signIn('pro')
+  const runsBefore = runs().length
+  await page.click('#toggle-settings')
+  await page.waitForFunction(() => (document.querySelector('#claude-account')?.textContent ?? '').includes('personal'))
+  check('Settings names the account and why it is refused', ((await page.textContent('#claude-account')) ?? '').includes('personal Pro plan'), (await page.textContent('#claude-account')) ?? '')
+  await page.selectOption('#claude-model', 'claude-haiku-4-5') // new model: every PR would be asked again
+  await page.click('#settings button[type=submit]')
+  await settled()
+  check('a personal plan: no Claude run at all', runs().length === runsBefore, `${runs().length - runsBefore} runs`)
+  check('and Summarize is no longer offered', (await page.locator('.ai-ask:not([hidden])').count()) === 0)
   check('no page errors', errors.length === 0, errors[0])
 } finally {
   await context.close()

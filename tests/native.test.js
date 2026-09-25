@@ -7,7 +7,7 @@ import { describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { hookOutput, markCommand } from '../native/claude-code-hook.mjs'
-import { handle, judge, judgeArgs, secret } from '../native/host.mjs'
+import { accountPolicy, handle, judge, judgeArgs, secret } from '../native/host.mjs'
 import { indexTranscript, sessionsFor } from '../native/scan.mjs'
 import { claudeCodeMark, resumeCommand } from '../lib/sessions.js'
 
@@ -43,7 +43,7 @@ describe('transcript scan', () => {
     assert.deepEqual(sessionsFor(index, ['O/R#1'])['o/r#1'].map((s) => s.sessionId), ['c', 'b', 'a'])
   })
 
-  it('answers over the helper protocol, skipping its own repo, caching by mtime', () => {
+  it('answers over the helper protocol, skipping its own repo, caching by mtime', async () => {
     const home = mkdtempSync(path.join(tmpdir(), 'pr-tracker-host-'))
     try {
       const projects = path.join(home, 'projects')
@@ -56,7 +56,7 @@ describe('transcript scan', () => {
       assert.deepEqual(answer, { ok: true, sessions: { 'o/api#5': [{ sessionId: ID, cwd: '/work/api', title: '', lastAt: '2026-01-01T00:00:00Z', kind: 'review' }] } })
       assert.ok(JSON.parse(readFileSync(cache, 'utf8'))[path.join(projects, 'p1', `${ID}.jsonl`)])
       assert.equal(statSync(cache).mode & 0o777, 0o600, 'the cache is private to this user')
-      assert.equal(/** @type {any} */ (handle({ type: 'ping' }, projects, cache)).version, 3)
+      assert.equal((await /** @type {any} */ (handle({ type: 'ping' }, projects, cache))).version, 4)
       assert.equal(/** @type {any} */ (handle({ type: 'nope' }, projects, cache)).ok, false)
     } finally {
       rmSync(home, { recursive: true, force: true })
@@ -72,16 +72,17 @@ describe('transcript scan', () => {
     const out = await new Promise((resolve) => child.stdout.once('data', resolve))
     child.kill()
     const buf = /** @type {Buffer} */ (out)
-    assert.equal(JSON.parse(buf.subarray(4, 4 + buf.readUInt32LE(0)).toString()).version, 3)
+    assert.equal(JSON.parse(buf.subarray(4, 4 + buf.readUInt32LE(0)).toString()).version, 4)
   })
 })
 
 describe('judge via Claude Code', () => {
   const request = { type: 'judge', model: 'claude-sonnet-5', system: 'S', schema: { type: 'object' }, prompt: 'the PR' }
-  /** A stand-in claude CLI: records its args and stdin, prints what the test says. @param {string} dir @param {string} print */
-  const fakeClaude = (dir, print) => {
+  const TEAM = JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', subscriptionType: 'team', orgName: 'acme' })
+  /** A stand-in claude CLI: answers `auth status` with `auth`; otherwise records its args and stdin, prints what the test says. @param {string} dir @param {string} print */
+  const fakeClaude = (dir, print, auth = TEAM) => {
     const bin = path.join(dir, 'claude')
-    writeFileSync(bin, `#!/bin/sh\nprintf '%s\\n' "$@" > "${dir}/args"\ncat > "${dir}/stdin"\nprintf '%s' '${print}'\n`)
+    writeFileSync(bin, `#!/bin/sh\nif [ "$1" = auth ]; then printf '%s' '${auth}'; exit 0; fi\nprintf '%s\\n' "$@" > "${dir}/args"\ncat > "${dir}/stdin"\nprintf '%s' '${print}'\n`)
     execFileSync('chmod', ['+x', bin])
     return bin
   }
@@ -99,6 +100,32 @@ describe('judge via Claude Code', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  it('refuses a personal plan before sending anything', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-tracker-judge-'))
+    try {
+      const pro = JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', subscriptionType: 'pro' })
+      const bin = fakeClaude(dir, JSON.stringify({ subtype: 'success', is_error: false, structured_output: { summary: 's', verdicts: [] } }), pro)
+      const r = /** @type {any} */ (await judge(request, bin))
+      assert.equal(r.ok, false)
+      assert.match(r.error, /signed in with a personal Pro plan.*only sends PR content to Claude under a company Team or Enterprise plan/)
+      assert.throws(() => readFileSync(path.join(dir, 'stdin')), 'claude -p never ran, so the PR never left')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('account policy: company plans and company clouds only', () => {
+    const base = { loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty' }
+    assert.deepEqual(accountPolicy({ ...base, subscriptionType: 'team', orgName: 'gdncomm-team08' }), { ok: true, label: 'Team plan · gdncomm-team08' })
+    assert.equal(accountPolicy({ ...base, subscriptionType: 'enterprise' }).ok, true)
+    assert.equal(accountPolicy({ loggedIn: true, apiProvider: 'bedrock' }).ok, true)
+    for (const plan of ['pro', 'max', 'free']) assert.equal(accountPolicy({ ...base, subscriptionType: plan }).ok, false, plan)
+    assert.equal(accountPolicy({ ...base }).ok, false, 'no plan reported')
+    assert.equal(accountPolicy({ loggedIn: true, authMethod: 'api_key', apiProvider: 'firstParty' }).ok, false, "a key we can't place")
+    assert.equal(accountPolicy({ loggedIn: false }).ok, false)
+    assert.equal(accountPolicy(null).ok, false)
   })
 
   it('passes on Claude Code errors (not logged in) and refuses odd requests', async () => {
