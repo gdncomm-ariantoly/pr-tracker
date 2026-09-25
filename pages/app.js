@@ -412,7 +412,10 @@ function renderPR(pr, viewer, showRepo) {
   const summary = /** @type {HTMLElement} */ (el.querySelector('.ai-summary'))
   const canAsk = state.claudeReady && pr.hasHumanComments
   summary.hidden = !pr.aiSummary && !canAsk
-  setText(el, '.ai-summary-text', pr.aiSummary ? `${pr.aiSummary}${pr.aiStale ? ' (outdated: the PR changed since)' : ''}` : '')
+  setText(el, '.ai-summary-text', pr.aiSummary ?? '')
+  const stale = /** @type {HTMLElement} */ (el.querySelector('.ai-stale'))
+  stale.hidden = !(pr.aiSummary && pr.aiStale)
+  summary.classList.toggle('stale', !!(pr.aiSummary && pr.aiStale))
   const mark = /** @type {HTMLElement} */ (el.querySelector('.ai-mark'))
   mark.hidden = !pr.aiSummary
   const ask = /** @type {HTMLButtonElement} */ (el.querySelector('.ai-ask'))

@@ -257,8 +257,12 @@ a.chip.build:hover { text-decoration: underline; }
 .s-ai-fixed { background: var(--ok-bg); color: var(--ok-fg); }
 .s-ai-unfixed { background: var(--bad-bg); color: var(--bad-fg); }
 .status.by-claude::after { content: " · Claude"; font-weight: 500; opacity: .75; }
-.ai-summary { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--fg); display: flex; gap: 8px; align-items: baseline; }
-.ai-ask { font-size: 12px; padding: 1px 10px; border-radius: 999px; }
+/* Its own row under the title and the counts, lined up with the title (past the ▸). */
+.ai-summary { flex: 1 0 100%; margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--fg); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.ai-summary-text { flex: 1 1 320px; min-width: 0; }
+.ai-summary.stale .ai-summary-text { color: var(--muted); }
+.ai-stale { flex: none; font-size: 10.5px; font-weight: 600; letter-spacing: .03em; padding: 0 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn-fg); }
+.ai-ask { flex: none; white-space: nowrap; font-size: 12px; padding: 1px 10px; border-radius: 999px; }
 .ai-mark { flex: none; font-size: 10.5px; font-weight: 600; letter-spacing: .03em; padding: 0 6px; border-radius: 4px; background: #f4e8dc; color: #9a4b16; }
 @media (prefers-color-scheme: dark) { .ai-mark { background: #3b2618; color: #f0a877; } }
 

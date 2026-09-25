@@ -112,7 +112,14 @@ try {
   await page.selectOption('#claude-model', 'claude-opus-5-5')
   await page.click('#settings button[type=submit]')
   await settled()
-  check('a refresh after a change asks nothing; the answer is marked outdated', runs().length === 1 && ((await pinned.locator('.ai-summary-text').textContent()) ?? '').includes('outdated') && ((await pinned.locator('.ai-ask').textContent()) ?? '') === 'Summarize again')
+  check('a refresh after a change asks nothing; the answer is marked outdated', runs().length === 1 && (await pinned.locator('.ai-stale').isVisible()) && ((await pinned.locator('.ai-ask').textContent()) ?? '') === 'Summarize again')
+  const layout = await pinned.evaluate((card) => {
+    const row = /** @type {HTMLElement} */ (card.querySelector('.ai-summary')).getBoundingClientRect()
+    const head = /** @type {HTMLElement} */ (card.querySelector('summary')).getBoundingClientRect()
+    const ask = /** @type {HTMLElement} */ (card.querySelector('.ai-ask'))
+    return { rowShare: row.width / head.width, askLines: Math.round(ask.getBoundingClientRect().height / parseFloat(getComputedStyle(ask).lineHeight)), below: row.top >= /** @type {HTMLElement} */ (card.querySelector('.tally')).getBoundingClientRect().bottom - 1 }
+  })
+  check('the summary gets its own full-width row, the button one line', layout.rowShare > 0.85 && layout.askLines === 1 && layout.below, JSON.stringify(layout))
   // Summarize every card on this tab, one click each.
   for (let i = 0; i < 10; i++) {
     const next = page.locator('.ai-ask:not([hidden]):not(:disabled)').first()
