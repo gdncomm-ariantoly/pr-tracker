@@ -424,12 +424,16 @@ function renderPR(pr, viewer, showRepo) {
     ask.disabled = true
     ask.textContent = 'Asking Claude…'
     const result = await judgeOnePR(pr.id, { claudeCode })
-    if (result.kind !== 'ok') {
-      ask.disabled = false
-      ask.textContent = { 'no-helper': 'Connect Claude Code first', error: 'Failed — retry', gone: 'PR gone' }[result.kind] ?? 'Failed'
-      ask.title = result.message ?? ''
-      if (result.message) showError(result.message)
-    } // on success the stored snapshot changes and the page repaints
+    if (result.kind === 'ok') {
+      // Repaint from storage ourselves: an unchanged answer raises no storage event.
+      state.snapshot = await loadSnapshot()
+      paint()
+      return
+    }
+    ask.disabled = false
+    ask.textContent = { 'no-helper': 'Connect Claude Code first', error: 'Failed — retry', gone: 'PR gone' }[result.kind] ?? 'Failed'
+    ask.title = result.message ?? ''
+    if (result.message) showError(result.message)
   })
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
@@ -777,7 +781,6 @@ $('settings').addEventListener('submit', async (event) => {
     jenkinsUser: input('jenkins-user').value.trim(),
     jenkinsToken,
     claudeModel: /** @type {HTMLSelectElement} */ ($('claude-model')).value,
-    claudeAuto: input('claude-auto').checked,
   })
   if (asking && (await asking) && origin) state.jenkinsGranted = await jenkinsAllowed(origin)
   state.jenkinsHasToken = !!(typedJenkins || current.jenkinsToken)
@@ -955,7 +958,6 @@ async function init() {
   input('jenkins-user').value = settings.jenkinsUser
   const model = /** @type {HTMLSelectElement} */ ($('claude-model'))
   model.value = settings.claudeModel
-  input('claude-auto').checked = settings.claudeAuto
   input('keychain').checked = settings.keychain
   if (settings.keychain) input('keychain').disabled = false
   // Summarize is offered once the helper is connected and the Claude account is a company one.

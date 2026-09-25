@@ -89,13 +89,7 @@ try {
   console.log('\nPR Tracker — Claude')
   await page.click('#toggle-settings')
   check('no API key field any more: Claude runs through Claude Code only', (await page.locator('#claude-key, #claude-via').count()) === 0)
-  check('Sonnet 5 is the default model, asking only on demand', (await page.inputValue('#claude-model')) === 'claude-sonnet-5' && !(await page.isChecked('#claude-auto')))
-  const autoRow = await page.evaluate(() => {
-    const label = /** @type {HTMLElement} */ (document.querySelector('#claude-auto')?.closest('label'))
-    const text = /** @type {HTMLElement} */ (label.querySelector('span'))
-    return { lines: Math.round(text.getBoundingClientRect().height / parseFloat(getComputedStyle(text).lineHeight || '20')), em: getComputedStyle(label).display, emInline: getComputedStyle(/** @type {HTMLElement} */ (label.querySelector('em'))).display }
-  })
-  check('the "Ask automatically" option reads as one sentence, not columns', autoRow.emInline === 'inline', JSON.stringify(autoRow))
+  check('Sonnet 5 is the default model, and there is no automatic asking', (await page.inputValue('#claude-model')) === 'claude-sonnet-5' && (await page.locator('#claude-auto').count()) === 0)
   await page.click('#settings button[type=submit]')
   await settled()
   check('on demand: a refresh asks Claude nothing', runs().length === 0, `${runs().length} calls`)
@@ -113,21 +107,29 @@ try {
   await settled()
   check('the answer survives a refresh without a new call', runs().length === 1 && ((await pinned.locator('.ai-summary-text').textContent()) ?? '').startsWith('Claude summary'))
 
-  // Automatic from here on.
+  // A new model changes what the answer would be: kept, marked outdated, still not re-asked.
   await page.click('#toggle-settings')
-  await page.check('#claude-auto')
   await page.selectOption('#claude-model', 'claude-opus-5-5')
   await page.click('#settings button[type=submit]')
   await settled()
+  check('a refresh after a change asks nothing; the answer is marked outdated', runs().length === 1 && ((await pinned.locator('.ai-summary-text').textContent()) ?? '').includes('outdated') && ((await pinned.locator('.ai-ask').textContent()) ?? '') === 'Summarize again')
+  // Summarize every card on this tab, one click each.
+  for (let i = 0; i < 10; i++) {
+    const next = page.locator('.ai-ask:not([hidden]):not(:disabled)').first()
+    if (!(await next.count())) break
+    const before = runs().length
+    await next.click()
+    for (let t = 0; t < 50 && runs().length === before; t++) await page.waitForTimeout(100)
+    await page.waitForTimeout(200)
+  }
   await openAll()
-  const auto = runs().slice(1)
-  check('Claude Code runs with the chosen model and no tools', auto[0]?.model === 'claude-opus-5-5' && auto[0]?.tools === '', JSON.stringify(auto[0] && { model: auto[0].model, tools: auto[0].tools }))
+  const clicked = runs().slice(1)
+  check('Claude Code runs with the chosen model and no tools', clicked[0]?.model === 'claude-opus-5-5' && clicked[0]?.tools === '', JSON.stringify(clicked[0] && { model: clicked[0].model, tools: clicked[0].tools }))
   const judged = await page.evaluate(async () => {
     const { snapshot } = await chrome.storage.local.get('snapshot')
-    const s = /** @type {any} */ (snapshot)
-    return new Set([...s.mine, ...s.toReview].filter((p) => p.hasHumanComments).map((p) => p.id)).size
+    return /** @type {any} */ (snapshot).mine.filter((/** @type {any} */ p) => p.hasHumanComments).length
   })
-  check('one run per PR with comments', auto.length === judged, `${auto.length} runs for ${judged} PRs`)
+  check('one run per Summarize click, one per PR', clicked.length === judged, `${clicked.length} runs for ${judged} PRs`)
   const summary = page.locator('.ai-summary:not([hidden])').first()
   check('PR cards show Claude\'s summary, marked as Claude\'s', /^Claude summary: \d+ comments looked at\.$/.test(((await summary.locator('.ai-summary-text').textContent()) ?? '').trim()) && (await summary.locator('.ai-mark').isVisible()), (await summary.textContent()) ?? '')
   if (process.env.SHOT) await page.locator('article.pr', { has: summary }).first().screenshot({ path: process.env.SHOT })

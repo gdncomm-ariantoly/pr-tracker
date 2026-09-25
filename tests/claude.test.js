@@ -108,42 +108,13 @@ describe('addClaudeJudgements', () => {
     return { data, get: async (/** @type {string} */ k) => ({ [k]: data[k] }), set: async (/** @type {Record<string, unknown>} */ o) => void Object.assign(data, o) }
   }
 
-  it('asks once, then reuses the answer until something changes', async () => {
-    const h = helper({ summary: 'Nothing blocking.', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] })
-    const area = memory()
-    const deps = { area, claudeCode: h }
-    const both = pr({})
-    const snap = /** @type {any} */ ({ mine: [both, pr({ id: 'quiet', hasHumanComments: false, findings: [] })], toReview: [{ ...both }], warnings: [] })
-    await addClaudeJudgements(snap, auth, deps)
-    assert.equal(h.runs.length, 1, 'once for a PR in both lists; none for a PR without comments')
-    assert.equal(snap.mine[0].findings[0].status, 'ai-fixed')
-    assert.equal(snap.toReview[0].aiSummary, 'Nothing blocking.')
-
-    await addClaudeJudgements(/** @type {any} */ ({ mine: [pr({})], toReview: [] }), auth, deps)
-    assert.equal(h.runs.length, 1, 'unchanged PR: cached')
-    await addClaudeJudgements(/** @type {any} */ ({ mine: [pr({ commits: [] })], toReview: [] }), auth, deps)
-    assert.equal(h.runs.length, 2, 'changed PR: asked again')
-  })
-
-  it('does nothing without the helper; a failed run keeps the rules and says why', async () => {
-    const none = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
-    await addClaudeJudgements(none, auth, { area: memory(), claudeCode: helper({}, false) })
-    assert.deepEqual(none.claude, { state: 'no-helper' })
-    assert.equal(none.mine[0].findings[0].status, 'open')
-
-    const bad = /** @type {any} */ ({ mine: [pr({})], toReview: [], warnings: [] })
-    await addClaudeJudgements(bad, auth, { area: memory(), claudeCode: helper(() => ({ ok: false, error: 'Not logged in' })) })
-    assert.equal(bad.mine[0].findings[0].status, 'open', "the rules' guess stays")
-    assert.match(bad.warnings[0], /Claude couldn't judge 1 PR.*Not logged in/)
-  })
-
-  it('manual mode: never calls, reuses answers, flags them outdated when the PR changed', async () => {
+  it('a refresh never asks Claude: only Summarize does, and the answer is reused', async () => {
     const h = helper({ summary: 'S', verdicts: [{ id: 'F1', verdict: 'fixed', reason: 'r' }] })
     const area = memory()
     const deps = { area, claudeCode: h }
     const fresh = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
-    await addClaudeJudgements(fresh, auth, deps, false)
-    assert.equal(h.runs.length, 0)
+    await addClaudeJudgements(fresh, auth, deps)
+    assert.equal(h.runs.length, 0, 'refresh: nothing sent')
     assert.equal(fresh.mine[0].aiSummary, undefined)
 
     // The card's Summarize button asks for that one PR.
@@ -154,14 +125,42 @@ describe('addClaudeJudgements', () => {
     assert.equal(saved.mine[0].aiSummary, 'S')
     assert.equal(saved.mine[0].findings[0].status, 'ai-fixed')
 
-    const same = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
-    await addClaudeJudgements(same, auth, deps, false)
+    // Same PR in both lists, unchanged: reused on both, still no run.
+    const same = /** @type {any} */ ({ mine: [pr({})], toReview: [pr({})] })
+    await addClaudeJudgements(same, auth, deps)
     assert.equal(same.mine[0].aiSummary, 'S', 'the answer is reused on the next refresh')
+    assert.equal(same.toReview[0].aiSummary, 'S')
     assert.equal(same.mine[0].aiStale, undefined)
     const changed = /** @type {any} */ ({ mine: [pr({ commits: [] })], toReview: [] })
-    await addClaudeJudgements(changed, auth, deps, false)
-    assert.equal(h.runs.length, 1)
+    await addClaudeJudgements(changed, auth, deps)
+    assert.equal(h.runs.length, 1, 'a changed PR is not re-asked either')
     assert.equal(changed.mine[0].aiStale, true, 'kept, but marked outdated')
+    assert.equal(changed.mine[0].aiSummary, 'S')
+
+    // Summarize again: the new answer is current, even when it reads the same.
+    await area.set({ snapshot: changed })
+    assert.deepEqual(await judgeOnePR('P1', deps), { kind: 'ok' })
+    assert.equal(/** @type {any} */ (area.data.snapshot).mine[0].aiStale, undefined)
+  })
+
+  it('two Summarize clicks finishing together both keep their answer', async () => {
+    const area = memory()
+    const two = { mine: [pr({}), pr({ id: 'P2', number: 2 })], toReview: [] }
+    await area.set({ snapshot: two, settings: { claudeModel: 'claude-sonnet-5' } })
+    const h = helper((/** @type {any} */ r) => ({ ok: true, output: { summary: r.prompt.includes('#2 ') ? 'Second.' : 'First.', verdicts: [] } }))
+    await Promise.all([judgeOnePR('P1', { area, claudeCode: h }), judgeOnePR('P2', { area, claudeCode: h })])
+    const saved = /** @type {any} */ (area.data.snapshot)
+    assert.deepEqual(saved.mine.map((/** @type {any} */ p) => p.aiSummary), ['First.', 'Second.'])
+    assert.deepEqual(Object.keys(/** @type {any} */ (area.data.claudeCache)).sort(), ['P1', 'P2'])
+  })
+
+  it("keeps answers even when the helper is down, and drops those for PRs that left", async () => {
+    const area = memory()
+    await area.set({ claudeCache: { P1: { sig: signature(describePR(pr({})), 'claude-sonnet-5'), at: '', judgement: { summary: 'Kept.', verdicts: [] } }, gone: { sig: 'x', at: '', judgement: { summary: 'old', verdicts: [] } } } })
+    const snap = /** @type {any} */ ({ mine: [pr({})], toReview: [] })
+    await addClaudeJudgements(snap, auth, { area })
+    assert.equal(snap.mine[0].aiSummary, 'Kept.')
+    assert.deepEqual(Object.keys(/** @type {any} */ (area.data.claudeCache)), ['P1'])
   })
 
   it('Summarize says what is wrong: no helper, or Claude Code failing', async () => {
