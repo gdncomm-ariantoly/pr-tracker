@@ -26,6 +26,7 @@
     "https://api.github.com/*"
   ],
   "optional_host_permissions": [
-    "https://*.gdn-app.com/*"
+    "https://*.gdn-app.com/*",
+    "https://api.anthropic.com/*"
   ]
 }

@@ -17,6 +17,12 @@ Anything that asks for a change ("before merge", "once … is addressed", "pleas
 
 Bots are excluded: GitHub App accounts, `*[bot]`, plus any logins you list in Settings. The badge shows how many PRs have your review requested; it refreshes on a timer (default 15 min).
 
+### Claude (optional)
+
+With an Anthropic API key in Settings (and a model: Opus 5 by default, Sonnet 5 or Haiku 4.5), Claude judges each comment as **fixed**, **not fixed** or **no action needed** from the thread and the PR's commit list, and writes a one-line summary of what still blocks the PR, shown on its card. Statuses it decided say *· Claude* and the "Why this status" line gives its reason. GitHub's own facts are never overruled: a resolved thread or code changed under a comment keeps that status. The **No action needed** button still works on anything Claude leaves as not fixed.
+
+One call per PR with human comments, only when what Claude would see changed (comments, replies, commits or the model), so a quiet refresh costs nothing; at most 12 new calls per refresh, the rest follow on the next one. Answers are cached in `chrome.storage.local`. Failures, refusals and a rejected key fall back to the rules' guess, with a warning or banner. Saving the key asks Chrome for access to `api.anthropic.com`. The request goes straight from the browser (raw `fetch`, since the extension has no build step to bundle the SDK) with the key in `x-api-key`. **It sends comment text, file paths and commit messages to Anthropic** — check that's allowed for your repositories — and is billed to the key's account, so give the key a spend limit.
+
 ### Jenkins build
 
 Jenkins reports each PR build to GitHub (a check run named "Jenkins CI"). The extension reads it from the PR's head commit, so no Jenkins login is needed, and shows a chip (e.g. **Jenkins #3 passed**, failed, running, queued) that links to the build. If several Jenkins jobs report, the worst one wins.
@@ -78,6 +84,7 @@ No build step — the extension is plain ES modules and loads as it sits.
 ```sh
 npm install
 npm test            # unit tests — no browser needed
+node tools/verify-claude.mjs   # Claude judging, against a replayed Anthropic API
 npm run typecheck   # JSDoc types via tsc --noEmit; nothing is compiled
 npm run verify      # loads the extension into a real Chromium and drives it (incl. tools/verify-jenkins.mjs)
 npm run package     # Web Store zip

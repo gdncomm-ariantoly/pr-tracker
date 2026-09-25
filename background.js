@@ -14,6 +14,8 @@ const APP = 'app' // notification-id prefix meaning "open the dashboard"
 const MAX_SEPARATE = 4 // beyond this, one summary notification instead of a flood
 /** Serialises inbox writes within this worker's lifetime (not state: nothing is lost if it restarts). */
 let inboxWrites = Promise.resolve()
+/** Has the user granted this optional host (Jenkins, Anthropic)? @param {string} origin */
+const allowed = (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] })
 
 chrome.action.onClicked.addListener(() => {
   void openApp()
@@ -28,7 +30,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) {
-    void refresh({ jenkinsAllowed: (origin) => chrome.permissions.contains({ origins: [`${origin}/*`] }) }).catch(() => {})
+    void refresh({ jenkinsAllowed: allowed, claudeAllowed: allowed }).catch(() => {})
   }
 })
 

@@ -4,6 +4,7 @@ import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { refresh } from '../lib/refresh.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
+import { CLAUDE_ORIGIN } from '../lib/claude.js'
 import { deployJenkinsLink, JENKINS_TEMPLATE, jenkinsJobUrl, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
@@ -23,6 +24,9 @@ const STATUS_LABEL = {
   open: 'Not addressed',
   'no-action': 'No action needed',
   optional: 'Optional',
+  'ai-fixed': 'Fixed',
+  'ai-no-action': 'No action needed',
+  'ai-unfixed': 'Not fixed',
 }
 
 const DECISION_LABEL = /** @type {Record<string, string>} */ ({
@@ -206,6 +210,10 @@ function renderFinding(f, viewer) {
   const status = /** @type {HTMLElement} */ (li.querySelector('.status'))
   status.textContent = STATUS_LABEL[f.status]
   status.className = `status s-${f.status}`
+  if (f.judgedBy === 'claude') {
+    status.classList.add('by-claude')
+    status.title = 'Decided by Claude'
+  }
   setText(li, '.who', f.author === viewer ? `${f.author} (you)` : f.author)
   li.querySelector('.avatar')?.replaceWith(avatar(f.author, f.avatar))
   const action =
@@ -333,6 +341,9 @@ function renderPR(pr, viewer, showRepo) {
   title.href = pr.url
   const meta = [showRepo ? pr.repo : '', state.tab === 'toReview' ? `by ${pr.author}` : '', `updated ${ago(pr.updatedAt)}`]
   setText(el, '.repo', meta.filter(Boolean).join(' · '))
+  const summary = /** @type {HTMLElement} */ (el.querySelector('.ai-summary'))
+  summary.hidden = !pr.aiSummary
+  setText(el, '.ai-summary-text', pr.aiSummary ?? '')
 
   const chips = /** @type {HTMLElement} */ (el.querySelector('.chips'))
   const deploy = deployJenkinsLink(pr)
@@ -413,6 +424,8 @@ function paint() {
   $('jenkins-access').hidden = !(origin && state.jenkinsHidden && !state.jenkinsHasToken)
   $('jenkins-grant-needed').hidden = !(origin && state.jenkinsHasToken && !state.jenkinsGranted)
   $('jenkins-bad-token').hidden = !snap?.jenkinsBadToken
+  $('claude-bad-key').hidden = snap?.claude?.state !== 'bad-key'
+  $('claude-grant-needed').hidden = snap?.claude?.state !== 'no-access'
   if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-token-link')).href = `${origin}/me/configure`
 
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
@@ -548,7 +561,7 @@ async function doRefresh() {
   btn.disabled = true
   btn.textContent = 'Refreshing…'
   try {
-    state.snapshot = await refresh({ jenkinsAllowed })
+    state.snapshot = await refresh({ jenkinsAllowed, claudeAllowed: jenkinsAllowed })
     showError(null)
     paint()
   } catch (error) {
@@ -573,7 +586,13 @@ $('settings').addEventListener('submit', async (event) => {
   // only allows the prompt synchronously inside the click, before any await.
   const typedJenkins = input('jenkins-token').value.trim()
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)
-  const asking = typedJenkins && origin && !state.jenkinsGranted ? chrome.permissions.request({ origins: [`${origin}/*`] }).catch(() => false) : null
+  const typedClaude = input('claude-key').value.trim()
+  // One prompt for everything newly needed: Chrome allows a single request per click.
+  const origins = [
+    ...(typedJenkins && origin && !state.jenkinsGranted ? [`${origin}/*`] : []),
+    ...(typedClaude ? [`${CLAUDE_ORIGIN}/*`] : []),
+  ]
+  const asking = origins.length ? chrome.permissions.request({ origins }).catch(() => false) : null
 
   const current = await loadSettings()
   const typed = input('token').value.trim()
@@ -588,8 +607,12 @@ $('settings').addEventListener('submit', async (event) => {
     watchedRepos,
     jenkinsUser: input('jenkins-user').value.trim(),
     jenkinsToken: typedJenkins || current.jenkinsToken,
+    claudeKey: typedClaude || current.claudeKey,
+    claudeModel: /** @type {HTMLSelectElement} */ ($('claude-model')).value,
   })
-  if (asking) state.jenkinsGranted = await asking
+  if (asking && (await asking) && origin) state.jenkinsGranted = await jenkinsAllowed(origin)
+  input('claude-key').value = ''
+  if (typedClaude || current.claudeKey) input('claude-key').placeholder = 'Key saved — paste a new one to replace it'
   state.jenkinsHasToken = !!(typedJenkins || current.jenkinsToken)
   input('token').value = ''
   input('jenkins-token').value = ''
@@ -619,6 +642,18 @@ $('jenkins-setup').addEventListener('click', () => {
   $('toggle-settings').setAttribute('aria-expanded', 'true')
   input('jenkins-user').focus()
 })
+$('claude-key-clear').addEventListener('click', async () => {
+  await saveSettings({ ...(await loadSettings()), claudeKey: '' })
+  input('claude-key').placeholder = 'Anthropic API key, sk-ant-…'
+  await doRefresh()
+})
+
+$('claude-grant').addEventListener('click', async () => {
+  // Synchronous inside the click: Chrome only shows the prompt for a user gesture.
+  const granted = await chrome.permissions.request({ origins: [`${CLAUDE_ORIGIN}/*`] }).catch(() => false)
+  if (granted) await doRefresh()
+})
+
 $('jenkins-token-clear').addEventListener('click', async () => {
   await saveSettings({ ...(await loadSettings()), jenkinsToken: '' })
   state.jenkinsHasToken = false
@@ -688,6 +723,9 @@ async function init() {
   minutes.value = String(settings.refreshMinutes)
   input('notify').checked = settings.notify
   input('jenkins-user').value = settings.jenkinsUser
+  const model = /** @type {HTMLSelectElement} */ ($('claude-model'))
+  model.value = settings.claudeModel
+  if (settings.claudeKey) input('claude-key').placeholder = 'Key saved — paste a new one to replace it'
   if (settings.jenkinsToken) input('jenkins-token').placeholder = 'Token saved — paste a new one to replace it'
   const origin = jenkinsOrigin(JENKINS_TEMPLATE)
   state.jenkinsGranted = origin ? await jenkinsAllowed(origin) : false

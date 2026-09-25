@@ -355,7 +355,7 @@ async function verify(context, id) {
   await item.hover()
   await item.locator('.i-remove').click()
   check('an update can be deleted on its own', (await page.locator('#inbox-list li').count()) === inboxBefore - 1)
-  const stored = await page.evaluate(async () => (await chrome.storage.local.get('inbox')).inbox.length)
+  const stored = await page.evaluate(async () => /** @type {unknown[]} */ ((await chrome.storage.local.get('inbox')).inbox).length)
   check('and stays deleted', stored === inboxBefore - 1, `${stored}`)
   await page.setViewportSize({ width: 900, height: 900 })
   check('narrow window: panel hidden behind an Updates button', (await page.isHidden('#inbox')) && (await page.isVisible('#toggle-inbox')))

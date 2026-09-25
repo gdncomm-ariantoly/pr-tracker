@@ -227,7 +227,13 @@ a.chip.build:hover { text-decoration: underline; }
 .s-resolved, .s-outdated, .s-fixed-reply { background: var(--ok-bg); color: var(--ok-fg); }
 .s-replied, .s-commit-after { background: var(--warn-bg); color: var(--warn-fg); }
 .s-open { background: var(--bad-bg); color: var(--bad-fg); }
-.s-no-action, .s-optional { background: var(--gray-bg); color: var(--gray-fg); }
+.s-no-action, .s-optional, .s-ai-no-action { background: var(--gray-bg); color: var(--gray-fg); }
+.s-ai-fixed { background: var(--ok-bg); color: var(--ok-fg); }
+.s-ai-unfixed { background: var(--bad-bg); color: var(--bad-fg); }
+.status.by-claude::after { content: " · Claude"; font-weight: 500; opacity: .75; }
+.ai-summary { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--fg); display: flex; gap: 8px; align-items: baseline; }
+.ai-mark { flex: none; font-size: 10.5px; font-weight: 600; letter-spacing: .03em; padding: 0 6px; border-radius: 4px; background: #f4e8dc; color: #9a4b16; }
+@media (prefers-color-scheme: dark) { .ai-mark { background: #3b2618; color: #f0a877; } }
 
 @media (max-width: 600px) {
   .bar { padding: 10px 16px; }
