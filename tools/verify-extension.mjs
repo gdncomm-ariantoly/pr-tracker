@@ -178,6 +178,18 @@ async function verify(context, id) {
   check('token is sent as Bearer', authHeaders[0] === 'Bearer test-token', authHeaders[0])
   check('settings form closes after save', !(await page.isVisible('#settings')))
   check('token field is cleared after save', (await page.inputValue('#token')) === '')
+  // Relative times age while the page sits open: backdate every stamp by 5 min, as if
+  // time had passed, and bring the tab back to the front.
+  const aged = await page.evaluate(() => {
+    for (const el of document.querySelectorAll('[data-ago]')) {
+      const e = /** @type {HTMLElement} */ (el)
+      e.dataset.ago = new Date(Date.parse(e.dataset.ago ?? '') - 5 * 60_000).toISOString()
+    }
+    document.dispatchEvent(new Event('visibilitychange'))
+    return { fetched: document.getElementById('fetched')?.textContent, stamped: document.querySelectorAll('[data-ago]').length }
+  })
+  check('"updated …" keeps counting without a click', aged.fetched === 'updated 5m ago', JSON.stringify(aged))
+  check('card and comment times are kept current too', aged.stamped > 3, `${aged.stamped} stamped`)
 
   const data = fixture.data
   const nMine = data.mine.nodes.length

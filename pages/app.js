@@ -86,6 +86,31 @@ function ago(iso) {
   return `${Math.floor(s / 86400)}d ago`
 }
 
+/**
+ * Show "<prefix>5m ago" and keep it current: the ticker below rewrites every
+ * element stamped this way, so the label ages while the page sits open.
+ * @param {Element} el @param {string} iso @param {string} [prefix]
+ */
+function stamp(el, iso, prefix = '') {
+  const e = /** @type {HTMLElement} */ (el)
+  e.dataset.ago = iso
+  e.dataset.agoPrefix = prefix
+  e.textContent = prefix + ago(iso)
+}
+
+function retick() {
+  for (const el of document.querySelectorAll('[data-ago]')) {
+    const e = /** @type {HTMLElement} */ (el)
+    const text = (e.dataset.agoPrefix ?? '') + ago(e.dataset.ago ?? '')
+    if (e.textContent !== text) e.textContent = text
+  }
+}
+setInterval(retick, 30_000)
+// Timers are throttled in a background tab: catch up as soon as it's back.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') retick()
+})
+
 /** @param {ParentNode} root @param {string} selector @param {string} text */
 function setText(root, selector, text) {
   const el = root.querySelector(selector)
@@ -274,7 +299,7 @@ function renderFinding(f, viewer) {
     if (f.path) where.setAttribute('title', f.path)
   }
   const when = /** @type {HTMLAnchorElement} */ (li.querySelector('.when'))
-  when.textContent = ago(f.createdAt)
+  stamp(when, f.createdAt)
   when.href = f.url
   when.title = new Date(f.createdAt).toLocaleString()
   const body = /** @type {HTMLElement} */ (li.querySelector('.body'))
@@ -297,7 +322,7 @@ function renderFinding(f, viewer) {
     when.href = c.url
     when.target = '_blank'
     when.rel = 'noopener'
-    when.textContent = ago(c.createdAt)
+    stamp(when, c.createdAt)
     head.append(avatar(c.author, c.avatar), who, verb, when)
     const text = document.createElement('div')
     text.className = 'markdown-body'
@@ -379,8 +404,9 @@ function renderPR(pr, viewer, showRepo) {
   const title = /** @type {HTMLAnchorElement} */ (el.querySelector('.title'))
   title.textContent = `#${pr.number} ${pr.title}`
   title.href = pr.url
-  const meta = [showRepo ? pr.repo : '', state.tab === 'toReview' ? `by ${pr.author}` : '', `updated ${ago(pr.updatedAt)}`]
-  setText(el, '.repo', meta.filter(Boolean).join(' · '))
+  const meta = [showRepo ? pr.repo : '', state.tab === 'toReview' ? `by ${pr.author}` : '', 'updated ']
+  const repoLine = el.querySelector('.repo')
+  if (repoLine) stamp(repoLine, pr.updatedAt, meta.filter(Boolean).join(' · '))
   // My PRs: who approved, who wants changes, whose review is still pending.
   const approvals = /** @type {HTMLElement} */ (el.querySelector('.approvals'))
   const a = pr.approvals
@@ -480,7 +506,9 @@ function renderPR(pr, viewer, showRepo) {
     title.title = s.sessionId
     const where = document.createElement('span')
     where.className = 'muted cc-where'
-    where.textContent = [s.cwd.split('/').pop(), s.lastAt ? ago(s.lastAt) : ''].filter(Boolean).join(' · ')
+    const folder = s.cwd.split('/').pop() ?? ''
+    if (s.lastAt) stamp(where, s.lastAt, folder ? `${folder} · ` : '')
+    else where.textContent = folder
     where.title = s.cwd
     const copy = document.createElement('button')
     copy.type = 'button'
@@ -589,7 +617,11 @@ function paint() {
   if (origin) /** @type {HTMLAnchorElement} */ ($('jenkins-token-link')).href = `${origin}/me/configure`
 
   $('viewer').textContent = snap?.viewer ? `@${snap.viewer}` : ''
-  $('fetched').textContent = snap ? `updated ${ago(snap.fetchedAt)}` : ''
+  if (snap) stamp($('fetched'), snap.fetchedAt, 'updated ')
+  else {
+    delete $('fetched').dataset.ago
+    $('fetched').textContent = ''
+  }
 
   if (!snap) {
     empty.hidden = false
@@ -664,7 +696,7 @@ function paintInbox() {
       side.textContent = item.side === 'mine' ? 'My PR' : 'To review'
       a.append(side)
     }
-    const parts = /** @type {const} */ ([['i-title', item.title], ['i-context', item.context], ['i-message', item.message], ['i-when', ago(item.at)]])
+    const parts = /** @type {const} */ ([['i-title', item.title], ['i-context', item.context], ['i-message', item.message]])
     for (const [cls, text] of parts) {
       if (!text) continue
       const span = document.createElement('span')
@@ -672,6 +704,10 @@ function paintInbox() {
       span.textContent = text
       a.append(span)
     }
+    const when = document.createElement('span')
+    when.className = 'i-when'
+    stamp(when, item.at)
+    a.append(when)
     a.addEventListener('click', () => {
       state.inbox = markRead(state.inbox, item.key)
       paintInbox()
