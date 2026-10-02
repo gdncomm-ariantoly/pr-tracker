@@ -112,13 +112,31 @@ Clicking a notification opens that comment on GitHub. More than 4 updates at onc
 
 ![screenshot](docs/screenshot.png)
 
+## Install
+
+No build step — the extension is plain ES modules and loads as it sits. Keep the folder somewhere permanent (e.g. `~/chrome-extensions/pr-tracker`): Chrome loads it from there on every launch.
+
+1. Open `chrome://extensions` (paste it into the address bar) and turn on **Developer mode**, top right.
+
+   <img src="docs/steps/developer-mode.png" width="460" alt="chrome://extensions with the Developer mode switch circled">
+
+2. Click **Load unpacked** and pick this folder (the one with `manifest.json`). A *PR Tracker* card appears.
+
+   <img src="docs/steps/load-unpacked.png" width="460" alt="The Load unpacked button circled, with the PR Tracker card below it">
+
+3. Pin it: puzzle-piece icon next to the address bar → pin next to PR Tracker. The badge counts PRs waiting for your review.
+
+After changing `manifest.json` or `background.js`, click the card's reload arrow.
+
 ## Setup
 
 1. Create a **fine-grained** token with Resource owner **gdncomm** ([pre-filled link](https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&description=Read-only+PR+dashboard&target_name=gdncomm&expires_in=90&pull_requests=read&contents=read&statuses=read)):
    - Repository access: **All repositories**
    - Permissions: **Pull requests**, **Contents** and **Commit statuses**, all Read-only (Metadata is automatic). Commit statuses is what shows the Jenkins build.
 2. If the org requires approval, wait until the token is no longer **pending**. No "Configure SSO" step is needed for fine-grained tokens.
-3. Open PR Tracker → Settings (opens as a pop-up; Esc or × closes it) → paste it → Save.
+3. Click the toolbar icon: Settings opens as a pop-up the first time (later: **Settings**, top right; Esc or × closes it). Paste the token → **Save**.
+
+   <img src="docs/steps/paste-token.png" width="460" alt="The Settings pop-up with the GitHub token field and Save circled">
 
 Only gdncomm repositories are covered: a fine-grained token has a single resource owner. A classic `repo` token also works (authorize it for SSO), but it grants far more than this read-only dashboard needs. It is stored only in this browser (`chrome.storage.local`, or the macOS Keychain — below) and sent only to `api.github.com`.
 
@@ -129,15 +147,11 @@ Only gdncomm repositories are covered: a fine-grained token has a single resourc
   1. `claude auth status --text` should show a **Team** or **Enterprise** plan (for Summarize); otherwise `claude` → `/logout` → `/login` with the company account.
   2. Run the install command from Settings → Claude Code helper, from this folder: `sh native/install.sh <extension-id> [--hook]`.
   3. Settings → Claude Code helper → **Connect**. It should say *Connected* and, under Claude summaries, *Team plan · … — summaries allowed*.
+
+     <img src="docs/steps/connect.png" width="460" alt="Settings, Claude Code helper: the Connect button circled">
+
   4. Optionally tick *Keep the GitHub and Jenkins tokens in the macOS Keychain* → Save.
 - **Updating:** unzip over the same folder, reload the card at `chrome://extensions`, and re-run the helper's install command (Settings says when it's out of date).
-
-## Install
-
-No build step — the extension is plain ES modules and loads as it sits.
-
-1. `chrome://extensions` → **Developer mode** → **Load unpacked** → this directory
-2. Reload from the card after changing `manifest.json` or `background.js`
 
 ## Development
 
@@ -147,6 +161,7 @@ npm test            # unit tests — no browser needed
 node tools/verify-claude.mjs   # Claude judging, through the real helper and a stand-in claude CLI
 node tools/verify-sessions.mjs # the native helper end to end: sessions + Summarize via a stand-in claude CLI
 node tools/make-screenshot.mjs # regenerate docs/screenshot.png (sample data)
+node tools/make-install-images.mjs # regenerate docs/steps/*.png (install step images)
 npm run typecheck   # JSDoc types via tsc --noEmit; nothing is compiled
 npm run verify      # loads the extension into a real Chromium and drives it (incl. tools/verify-jenkins.mjs)
 npm run package     # Web Store zip
