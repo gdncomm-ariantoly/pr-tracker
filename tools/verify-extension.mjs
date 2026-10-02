@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from '@playwright/test'
 
+import { loadFixture } from './fixture.mjs'
+
 const ROOT = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 
 /** Directories to load, by the `name` in each manifest. */
@@ -107,7 +109,7 @@ const FIXTURE = process.env.FIXTURE ?? path.join(ROOT, 'tests/fixtures/dashboard
 async function verify(context, id) {
   console.log('\nPR Tracker')
   const { readFileSync } = await import('node:fs')
-  const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'))
+  const fixture = loadFixture(FIXTURE)
   /** @type {string[]} */
   const authHeaders = []
   let mode = 'ok'
@@ -547,6 +549,38 @@ async function verify(context, id) {
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
   check('clearing the list stops the watched search', watchedQueries.length === watchedBeforeClear && (await page.locator('article.pr[data-id="WATCHED1"]').count()) === 0)
   await page.click('#tab-mine')
+
+  // OrgSignals: a PR in a scored repo shows its metrics; deployment and other repos don't.
+  const beforeSignals = fixture.data
+  const scored = structuredClone(fixture.data)
+  const sig = scored.mine.nodes[0]
+  Object.assign(sig, { repository: { nameWithOwner: 'gdncomm/seo-backend' }, baseRefName: 'master', additions: 900, deletions: 100, createdAt: new Date(Date.now() - 50 * 3600_000).toISOString() })
+  sig.firstCommit = { nodes: [{ commit: { authoredDate: new Date(Date.now() - 51 * 3600_000).toISOString() } }] }
+  const deploy = scored.mine.nodes[1]
+  Object.assign(deploy, { repository: { nameWithOwner: 'gdncomm/seo-backend-deployment-prod' }, baseRefName: 'master', additions: 5, deletions: 1 })
+  fixture.data = scored
+  await page.click('#refresh')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  const sigRow = page.locator(`article.pr[data-id="${sig.id}"] .signals`)
+  const sigChip = (/** @type {string} */ key) => sigRow.locator(`.chip.sig[data-metric="${key}"]`)
+  check('a scored PR shows its OrgSignals metrics', (await sigRow.count()) === 1 && !(await sigRow.evaluate((e) => /** @type {HTMLElement} */ (e).hidden)) && (await sigRow.locator('.chip.sig').count()) >= 6, `${await sigRow.locator('.chip.sig').count()} chips`)
+  check('PR size 1,000 lines is Needs focus, with the tiers in its tooltip', ((await sigChip('pr_size').textContent()) ?? '') === 'Size 1,000' && ((await sigChip('pr_size').getAttribute('class')) ?? '').includes('t-focus') && ((await sigChip('pr_size').getAttribute('title')) ?? '').includes('Elite ≤ 250 lines'))
+  check('coding time is first commit → opened', ((await sigChip('coding_time').textContent()) ?? '') === 'Coding 1h', (await sigChip('coding_time').textContent()) ?? '')
+  check('a deployment (prod) repo PR shows none', await page.locator(`article.pr[data-id="${deploy.id}"] .signals`).evaluate((e) => /** @type {HTMLElement} */ (e).hidden))
+  check('nor does a repo OrgSignals doesn\'t track', await page.locator(`article.pr[data-id="${scored.mine.nodes[2]?.id ?? deploy.id}"] .signals`).evaluate((e) => /** @type {HTMLElement} */ (e).hidden))
+  await page.click('#toggle-settings')
+  check('the switch is on by default', await page.isChecked('#signals'))
+  await page.uncheck('#signals')
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  check('switching it off hides the metrics', await sigRow.evaluate((e) => /** @type {HTMLElement} */ (e).hidden))
+  await page.click('#toggle-settings')
+  await page.check('#signals')
+  await page.click('#settings button[type=submit]')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
+  fixture.data = beforeSignals
+  await page.click('#refresh')
+  await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
 
   // Build status hidden from the token: fall back to a Jenkins job link, no standing banner.
   mode = 'jenkins-hidden'

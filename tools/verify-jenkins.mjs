@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from '@playwright/test'
 
+import { loadFixture } from './fixture.mjs'
+
 const ROOT = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 const JENKINS = 'https://jenkins-build-ci-2.gdn-app.com'
 let checks = 0
@@ -36,7 +38,7 @@ const manifest = JSON.parse(readFileSync(path.join(ext, 'manifest.json'), 'utf8'
 manifest.host_permissions = [...manifest.host_permissions, `${JENKINS}/*`]
 writeFileSync(path.join(ext, 'manifest.json'), JSON.stringify(manifest, null, 2))
 
-const fixture = JSON.parse(readFileSync(path.join(ROOT, 'tests/fixtures/dashboard.json'), 'utf8'))
+const fixture = loadFixture()
 const hide = (/** @type {any} */ s) => ({ ...s, nodes: s.nodes.map((/** @type {any} */ n) => ({ ...n, head: { nodes: [{ commit: { statusCheckRollup: null } }] } })) })
 const d = fixture.data
 const github = {

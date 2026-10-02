@@ -69,6 +69,22 @@ Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployme
 
 **Status straight from Jenkins (API token).** GitHub doesn't show Jenkins check runs to fine-grained tokens, so pass/fail comes from Jenkins itself. Settings → *Jenkins API token* takes your Jenkins user ID and an API token (Jenkins → your name → Security/Configure → API Token → Add new token). Saving it asks Chrome for access to the Jenkins host (`*.gdn-app.com`). Each refresh then finds the repo's **team folder** — repos live under different teams (`GDN/TRFCEE`, `GDN/SEO`, … 84 folders): one request lists them all (~250 KB, cached for a day, re-listed within the hour when a PR's repo isn't in it), a repo in several folders is tried in each — and asks `…/job/GDN/job/<folder>/job/<repo>/job/PR-{number}/lastBuild/api/json` with HTTP Basic auth, at most 6 at a time. The browser's Jenkins session is never used. No job (404): no chip. A rejected token (401): red banner. Without a token, PRs show a plain **Jenkins ↗** link and a banner offers adding one. Jenkins tokens are not scoped: it carries your full Jenkins rights, though PR Tracker only reads with it. It's stored in `chrome.storage.local` like the GitHub token.
 
+### OrgSignals metrics
+
+Every PR that OrgSignals (Signals AI) scores gets a row of chips under its tally, coloured by tier — green Elite, blue High, yellow Medium, red Needs focus, gray No activity — with the tier scale in each chip's tooltip:
+
+| Chip | Metric | Elite |
+|---|---|---|
+| Size 320 | PR size: additions + deletions | ≤ 250 lines |
+| Coding 3h | Coding time: first authored commit → PR opened | ≤ 2 h |
+| 2 after open | Commits after PR raised (merge commits included) | ≤ 1 |
+| 1st review 2h / No review · 8h | Time to first comment: opened → first review or inline comment by someone else (conversation comments don't count); while nobody has looked, the clock keeps running | ≤ 6 h |
+| 3 comments | Comment count per PR: reviews + inline + conversation comments by other people (0 scores *No activity*) | 1–5 |
+| Cycle 23h | Cycle time if merged now: first commit → now | ≤ 27 h |
+| Unreviewed | Nobody else has reviewed it yet; merged like this it counts against *Unreviewed PRs merged* | — |
+
+**Which PRs.** Only those OrgSignals scores: the team's tracked repos (56, from the OrgSignals team settings) merging into `master` or `release/*`. Deployment repos — `prod-…`, `nonprod-…` (Rundeck, infra, deploy) and `*-deployment-*` — never get chips, nor do other squads' repos or PRs into other branches. The rules are computed from GitHub the way the growth-signals *sprint-score* skill does it (bots, Jenkins and deleted accounts never count as reviewers; the page's own *Extra bot logins* don't apply), so they can differ slightly from OrgSignals' own numbers. OrgSignals scores a sprint by the P75 of these per-PR values, so a red chip on one PR is a hint, not your score. The repo list and tier bounds are copied into `lib/signals.js`; update them when the lead changes the team settings. Switch off in Settings → *Show OrgSignals metrics on each PR*.
+
 ### Layout
 
 **Refresh one PR:** the **↻** on each card fetches just that PR again (one small GraphQL request, under a second) — comments, approvals, Jenkins build, Claude Code sessions, and the stored Claude answer (marked outdated if the PR changed; never re-asked). A PR merged or closed meanwhile leaves the list with a note. Updates it brings (a new comment, an approval) reach the Updates panel and notifications like any refresh.

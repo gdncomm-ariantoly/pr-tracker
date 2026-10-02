@@ -25,13 +25,14 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `lib/notify.js` | Snapshot diff into update events |
 | `lib/inbox.js` | Updates panel history (last 100) |
 | `lib/overrides.js` | User's "No action needed" marks layered over analysis |
+| `lib/signals.js` | OrgSignals per-PR metrics: scope (team repos, `master`/`release/*`, never `prod-`/`nonprod-` deployment repos), tiers and bot rule copied from growth-signals `sprint-score` `scoring.json` |
 | `lib/sessions.js` | PR ↔ Claude Code session links (comment marker + helper scan) |
 | `lib/store.js` | Settings, snapshot, caches in `chrome.storage.local` (storage area is an argument for tests) |
 | `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings is a modal `<dialog>` (`#settings-dialog`), with its own error line `#settings-error` since the page banner sits behind it |
 | `pages/markdown.js` | Renders GitHub `bodyHTML` through an allowlist, parsed inert; never trust remote HTML |
 | `native/` | Local native-messaging helper: `host.mjs` (sessions scan, runs `claude -p` with no tools), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` |
 | `tests/` | `node --test` unit tests, `tests/fixtures/` sample GraphQL data |
-| `tools/` | Browser verification (Playwright), packaging, icon and screenshot generation |
+| `tools/` | Browser verification (Playwright), packaging, icon and screenshot generation; `tools/fixture.mjs` replays the sample data with its dates moved to today so it never goes Stale |
 | `docs/` | `install.html` + `screenshot.png` (install page) |
 | `dist/` | Built output (gitignored) |
 

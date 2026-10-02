@@ -16,6 +16,8 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from '@playwright/test'
 
+import { loadFixture } from './fixture.mjs'
+
 const ROOT = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 const SESSION = '57609ddd-15b6-4739-a098-97387dc48b05'
 const KEYCHAIN_TEST = `com.gdncomm.pr-tracker.verify-${process.pid}`
@@ -48,7 +50,7 @@ writeFileSync(
 )
 
 // Marker in one fixture comment, as the hook would have added it.
-const fixture = JSON.parse(readFileSync(path.join(ROOT, 'tests/fixtures/dashboard.json'), 'utf8'))
+const fixture = loadFixture()
 const thread = fixture.data.mine.nodes[0].reviewThreads.nodes[0].comments.nodes[0]
 thread.body = `${thread.body}\n\n<!-- claude-code-session: ${SESSION} -->`
 

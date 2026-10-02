@@ -6,8 +6,9 @@ import { ciSearchLink, DEFAULTS, deployJenkinsLink, jenkinsJobUrl, JENKINS_TEMPL
 it('normalises settings', () => {
   assert.deepEqual(normalise(undefined), DEFAULTS)
   assert.deepEqual(normalise({ token: ' x ', extraBots: ['Jenkins', 3, ''], refreshMinutes: -5 }), {
-    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsUser: '', jenkinsToken: '', watchedRepos: [], claudeModel: 'claude-sonnet-5', keychain: false,
+    token: 'x', extraBots: ['jenkins'], refreshMinutes: 15, notify: true, jenkinsUser: '', jenkinsToken: '', watchedRepos: [], claudeModel: 'claude-sonnet-5', keychain: false, signals: true,
   })
+  assert.equal(normalise({ signals: false }).signals, false, 'OrgSignals chips can be switched off')
 })
 
 it('reads watched repos: bare names are gdncomm, URLs are accepted, junk is dropped', () => {

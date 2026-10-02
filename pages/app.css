@@ -164,6 +164,16 @@ details.stale .pr { opacity: .8; }
 .ap-bad { color: var(--bad-fg); } .ap-bad::before { content: "✕"; }
 .ap-wait { color: var(--warn-fg); } .ap-wait::before { content: "◷"; }
 
+.signals { display: flex; gap: 4px 6px; flex-wrap: wrap; align-items: center; flex: 1 0 100%; padding-left: 18px; }
+.sig-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-right: 2px; }
+.chip.sig { font-size: 11.5px; padding: 0 7px; cursor: help; }
+.chip.sig::before { content: "●"; margin-right: 4px; font-size: 8px; vertical-align: 1px; }
+.chip.t-elite { background: var(--ok-bg); color: var(--ok-fg); }
+.chip.t-high { background: var(--info-bg); color: var(--info-fg); }
+.chip.t-medium { background: var(--warn-bg); color: var(--warn-fg); }
+.chip.t-focus { background: var(--bad-bg); color: var(--bad-fg); }
+.chip.t-none { background: var(--gray-bg); color: var(--gray-fg); }
+
 .chip { font-size: 12px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; background: var(--gray-bg); color: var(--gray-fg); }
 .c-human { background: var(--info-bg); color: var(--info-fg); }
 .c-fixed, .c-approved { background: var(--ok-bg); color: var(--ok-fg); }

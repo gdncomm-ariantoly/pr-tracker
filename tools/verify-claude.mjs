@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from '@playwright/test'
 
+import { loadFixture } from './fixture.mjs'
+
 const ROOT = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 let checks = 0
 let failures = 0
@@ -57,7 +59,7 @@ const signIn = (plan) => writeFileSync(path.join(work, 'auth.json'), JSON.string
 signIn('team')
 /** @returns {{model: string, tools: string, prompt: string}[]} */
 const runs = () => (existsSync(calls) ? readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
-const fixture = readFileSync(path.join(ROOT, 'tests/fixtures/dashboard.json'), 'utf8')
+const fixture = JSON.stringify(loadFixture())
 
 const context = await chromium.launchPersistentContext(path.join(work, 'profile'), {
   channel: 'chromium',

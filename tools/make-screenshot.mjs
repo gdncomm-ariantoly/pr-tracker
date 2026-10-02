@@ -6,16 +6,18 @@
  *   node tools/make-screenshot.mjs [out.png] [--headed]
  */
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { chromium } from '@playwright/test'
 
+import { loadFixture } from './fixture.mjs'
+
 const ROOT = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
 const out = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? path.join(ROOT, 'docs/screenshot.png')
-const fixture = readFileSync(path.join(ROOT, 'tests/fixtures/dashboard.json'), 'utf8')
+const fixture = JSON.stringify(loadFixture())
 const work = mkdtempSync(path.join(tmpdir(), 'pr-tracker-shot-'))
 
 const context = await chromium.launchPersistentContext(path.join(work, 'profile'), {

@@ -4,6 +4,7 @@ import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { judgeOnePR, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
+import { readings } from '../lib/signals.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { resumeCommand } from '../lib/sessions.js'
 import { claudeCode, helperInfo, localSessions, nativeAllowed, secrets, SUMMARY_HELPER } from '../platform.js'
@@ -49,6 +50,7 @@ const state = {
   jenkinsGranted: false,
   jenkinsHasToken: false,
   claudeReady: false,
+  showSignals: true,
   /** @type {import('../lib/inbox.js').InboxItem[]} */ inbox: [],
   /** Folded comments (fixed / no action needed) the user opened. */
   /** @type {Set<string>} */ unfolded: new Set(),
@@ -104,6 +106,32 @@ function retick() {
     const text = (e.dataset.agoPrefix ?? '') + ago(e.dataset.ago ?? '')
     if (e.textContent !== text) e.textContent = text
   }
+  // "No review · 8h" and cycle time keep counting too.
+  for (const row of document.querySelectorAll('.signals:not([hidden])')) {
+    const facts = signalFacts.get(row)
+    if (facts) paintSignals(/** @type {HTMLElement} */ (row), facts)
+  }
+}
+
+/** @type {WeakMap<Element, import('../lib/signals.js').SignalsFacts>} */
+const signalFacts = new WeakMap()
+
+const TIER_CLASS = { ELITE: 't-elite', HIGH: 't-high', MEDIUM: 't-medium', NEEDS_FOCUS: 't-focus', NO_ACTIVITY: 't-none' }
+
+/** OrgSignals chips for one PR. @param {HTMLElement} row @param {import('../lib/signals.js').SignalsFacts} facts */
+function paintSignals(row, facts) {
+  signalFacts.set(row, facts)
+  const label = row.querySelector('.sig-label')
+  row.replaceChildren(...(label ? [label] : []))
+  for (const r of readings(facts)) {
+    const c = document.createElement('span')
+    c.className = `chip sig ${TIER_CLASS[r.tier]}`
+    c.dataset.metric = r.key
+    c.textContent = r.text
+    c.title = r.title
+    row.append(c)
+  }
+  row.hidden = false
 }
 setInterval(retick, 30_000)
 // Timers are throttled in a background tab: catch up as soon as it's back.
@@ -518,6 +546,9 @@ function renderPR(pr, viewer, showRepo) {
     ccList.append(row)
   }
 
+  const signalsRow = /** @type {HTMLElement} */ (el.querySelector('.signals'))
+  if (state.showSignals && pr.signals) paintSignals(signalsRow, pr.signals)
+
   const tally = /** @type {HTMLElement} */ (el.querySelector('.tally'))
   if (!pr.hasHumanComments) {
     tally.append(chip('No human comments', 'c-muted'))
@@ -868,11 +899,13 @@ $('settings').addEventListener('submit', async (event) => {
     extraBots: parseList(/** @type {HTMLTextAreaElement} */ ($('bots')).value),
     refreshMinutes: Number(/** @type {HTMLSelectElement} */ ($('minutes')).value),
     notify: input('notify').checked,
+    signals: input('signals').checked,
     watchedRepos,
     jenkinsUser: input('jenkins-user').value.trim(),
     jenkinsToken,
     claudeModel: /** @type {HTMLSelectElement} */ ($('claude-model')).value,
   })
+  state.showSignals = input('signals').checked
   if (asking && (await asking) && origin) state.jenkinsGranted = await jenkinsAllowed(origin)
   state.jenkinsHasToken = !!(typedJenkins || current.jenkinsToken)
   input('token').value = ''
@@ -1041,6 +1074,8 @@ async function init() {
   const minutes = /** @type {HTMLSelectElement} */ ($('minutes'))
   minutes.value = String(settings.refreshMinutes)
   input('notify').checked = settings.notify
+  input('signals').checked = settings.signals
+  state.showSignals = settings.signals
   input('jenkins-user').value = settings.jenkinsUser
   const model = /** @type {HTMLSelectElement} */ ($('claude-model'))
   model.value = settings.claudeModel
