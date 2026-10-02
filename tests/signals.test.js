@@ -14,7 +14,7 @@ function pr(/** @type {Record<string, unknown>} */ over = {}) {
     id: 'P1', number: 7, title: 't', url: 'u', isDraft: false, createdAt: at(10), updatedAt: at(12), reviewDecision: null,
     author: user('me'),
     repository: { nameWithOwner: 'gdncomm/seo-backend' },
-    baseRefName: 'master',
+    baseRefName: 'release/2026.10',
     additions: 300, deletions: 20,
     commits: { totalCount: 3, nodes: [
       { commit: { oid: 'a', authoredDate: at(7), committedDate: at(9), messageHeadline: 'one' } },
@@ -39,17 +39,18 @@ function pr(/** @type {Record<string, unknown>} */ over = {}) {
 }
 
 describe('OrgSignals scope', () => {
-  it('scores team repos merging into master or release/*', () => {
-    assert.equal(inScope('gdncomm/seo-backend', 'master'), true)
+  it('scores team repos merging into a release branch only', () => {
+    assert.equal(inScope('gdncomm/seo-backend', 'release/2026-10-14-SP12'), true)
     assert.equal(inScope('gdncomm/Seo-Backend', 'release/2026.10'), true)
+    assert.equal(inScope('gdncomm/seo-backend', 'master'), false)
   })
   it('never deployment (nonprod / prod) repos, other repos or other branches', () => {
-    assert.equal(inScope('gdncomm/seo-backend-deployment-nonprod', 'master'), false)
-    assert.equal(inScope('gdncomm/seo-backend-deployment-prod', 'master'), false)
-    assert.equal(inScope('gdncomm/nonprod-rundeck-gdn-preprod', 'master'), false)
-    assert.equal(inScope('gdncomm/prod-infra-gdn-traffic-tracker-aggregator-mongo-updates', 'master'), false)
-    assert.equal(inScope('gdncomm/pr-tracker', 'master'), false)
-    assert.equal(inScope('acme/seo-backend', 'master'), false)
+    assert.equal(inScope('gdncomm/seo-backend-deployment-nonprod', 'release/x'), false)
+    assert.equal(inScope('gdncomm/seo-backend-deployment-prod', 'release/x'), false)
+    assert.equal(inScope('gdncomm/nonprod-rundeck-gdn-preprod', 'release/x'), false)
+    assert.equal(inScope('gdncomm/prod-infra-gdn-traffic-tracker-aggregator-mongo-updates', 'release/x'), false)
+    assert.equal(inScope('gdncomm/pr-tracker', 'release/x'), false)
+    assert.equal(inScope('acme/seo-backend', 'release/x'), false)
     assert.equal(inScope('gdncomm/seo-backend', 'develop'), false)
     assert.equal(inScope('gdncomm/seo-backend', 'release'), false)
     assert.equal(inScope('gdncomm/seo-backend', undefined), false)

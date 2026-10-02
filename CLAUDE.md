@@ -25,7 +25,7 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `lib/notify.js` | Snapshot diff into update events |
 | `lib/inbox.js` | Updates panel history (last 100) |
 | `lib/overrides.js` | User's "No action needed" marks layered over analysis |
-| `lib/signals.js` | OrgSignals per-PR metrics: scope (team repos, `master`/`release/*`, never `prod-`/`nonprod-` deployment repos), tiers and bot rule copied from growth-signals `sprint-score` `scoring.json` |
+| `lib/signals.js` | OrgSignals per-PR metrics: scope (team repos, base `release/*` only, never `prod-`/`nonprod-` deployment repos), tiers and bot rule copied from growth-signals `sprint-score` `scoring.json` |
 | `lib/sessions.js` | PR ↔ Claude Code session links (comment marker + helper scan) |
 | `lib/store.js` | Settings, snapshot, caches in `chrome.storage.local` (storage area is an argument for tests) |
 | `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings (`#settings-dialog`, with its own error line `#settings-error` since the page banner sits behind it) and OrgSignals (`#signals-dialog`, opened from a card's `.sig-open` button) are modal `<dialog>`s sharing the `.modal` styles |

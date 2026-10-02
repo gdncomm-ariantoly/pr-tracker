@@ -30,7 +30,7 @@
           <button type="button" class="close" id="signals-close" aria-label="Close OrgSignals" title="Close (Esc)">×</button>
         </div>
         <ul class="sig-list" id="signals-rows"></ul>
-        <p class="muted sig-foot">Where this PR lands on each metric OrgSignals scores, computed from GitHub the way the growth-signals <em>sprint-score</em> skill does, so it can differ slightly from OrgSignals. Your sprint score is the P75 across your PRs (the value 3 of 4 are at or below), so one weak PR is a hint, not your score. Shown only for the team's tracked repos merging into <code>master</code> or <code>release/*</code>; never deployment (prod / nonprod) repos.</p>
+        <p class="muted sig-foot">Where this PR lands on each metric OrgSignals scores, computed from GitHub the way the growth-signals <em>sprint-score</em> skill does, so it can differ slightly from OrgSignals. Your sprint score is the P75 across your PRs (the value 3 of 4 are at or below), so one weak PR is a hint, not your score. Shown only for the team's tracked repos merging into a <code>release/*</code> branch; never deployment (prod / nonprod) repos.</p>
       </div>
     </dialog>
 
@@ -101,7 +101,7 @@
       <label class="check">
         <input type="checkbox" id="signals" />
         Show OrgSignals metrics on each PR
-        <small class="muted">An <em>OrgSignals</em> button on the PR, coloured by its weakest tier, opens PR size, coding time, commits after the PR was raised, time to first comment, comment count and cycle time so far, each with its OrgSignals tier (Elite, High, Medium, Needs focus). Only on PRs OrgSignals scores: the team's tracked repos, merging into <code>master</code> or <code>release/*</code> — never deployment (nonprod / prod) repos. Computed from GitHub like the growth-signals <em>sprint-score</em> skill, so it can differ slightly from OrgSignals.</small>
+        <small class="muted">An <em>OrgSignals</em> button on the PR, coloured by its weakest tier, opens PR size, coding time, commits after the PR was raised, time to first comment, comment count and cycle time so far, each with its OrgSignals tier (Elite, High, Medium, Needs focus). Only on PRs OrgSignals scores: the team's tracked repos, merging into a <code>release/*</code> branch — not <code>master</code>, and never deployment (nonprod / prod) repos. Computed from GitHub like the growth-signals <em>sprint-score</em> skill, so it can differ slightly from OrgSignals.</small>
       </label>
       <label class="check">
         <input type="checkbox" id="notify" />

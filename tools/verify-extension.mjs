@@ -554,10 +554,12 @@ async function verify(context, id) {
   const beforeSignals = fixture.data
   const scored = structuredClone(fixture.data)
   const sig = scored.mine.nodes[0]
-  Object.assign(sig, { repository: { nameWithOwner: 'gdncomm/seo-backend' }, baseRefName: 'master', additions: 900, deletions: 100, createdAt: new Date(Date.now() - 50 * 3600_000).toISOString() })
+  Object.assign(sig, { repository: { nameWithOwner: 'gdncomm/seo-backend' }, baseRefName: 'release/2026-10-14', additions: 900, deletions: 100, createdAt: new Date(Date.now() - 50 * 3600_000).toISOString() })
   sig.firstCommit = { nodes: [{ commit: { authoredDate: new Date(Date.now() - 51 * 3600_000).toISOString() } }] }
   const deploy = scored.mine.nodes[1]
-  Object.assign(deploy, { repository: { nameWithOwner: 'gdncomm/seo-backend-deployment-prod' }, baseRefName: 'master', additions: 5, deletions: 1 })
+  Object.assign(deploy, { repository: { nameWithOwner: 'gdncomm/seo-backend-deployment-prod' }, baseRefName: 'release/2026-10-14', additions: 5, deletions: 1 })
+  const intoMaster = scored.requested.nodes[0]
+  Object.assign(intoMaster, { repository: { nameWithOwner: 'gdncomm/seo-backend' }, baseRefName: 'master', additions: 5, deletions: 1 })
   fixture.data = scored
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
@@ -581,6 +583,9 @@ async function verify(context, id) {
   check('Esc closes it', !(await sigModal.evaluate((d) => /** @type {HTMLDialogElement} */ (d).open)))
   check('a deployment (prod) repo PR has no button', (await page.locator(`article.pr[data-id="${deploy.id}"] .sig-open`).count()) === 0)
   check('nor does a repo OrgSignals doesn\'t track', (await page.locator(`article.pr[data-id="${scored.mine.nodes[2]?.id ?? deploy.id}"] .sig-open`).count()) === 0)
+  await page.click('#tab-toReview')
+  check('nor does a tracked repo\'s PR into master', (await page.locator(`article.pr[data-id="${intoMaster.id}"]`).count()) === 1 && (await page.locator(`article.pr[data-id="${intoMaster.id}"] .sig-open`).count()) === 0)
+  await page.click('#tab-mine')
   check('Stale cards keep their gap', await page.evaluate(() => {
     const cards = [...document.querySelectorAll('details.stale[open] > .pr')]
     return cards.length < 2 || cards[1].getBoundingClientRect().top - cards[0].getBoundingClientRect().bottom >= 6
