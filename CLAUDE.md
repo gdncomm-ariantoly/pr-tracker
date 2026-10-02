@@ -33,7 +33,7 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `native/` | Local native-messaging helper: `host.mjs` (sessions scan; runs `claude -p` with no tools, only after `claude auth status` shows a Team/Enterprise plan or Bedrock/Vertex; Keychain `secret-get/set/delete` via `/usr/bin/security`), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` (writes the gitignored `host-run.sh` launcher and the Chrome host manifest) |
 | `tests/` | `node --test` unit tests, `tests/fixtures/` sample GraphQL data |
 | `tools/` | Browser verification (Playwright), packaging, icon and screenshot generation; `tools/fixture.mjs` replays the sample data with its dates moved to today so it never goes Stale |
-| `docs/` | `install.html` + `screenshot.png` (install page) |
+| `docs/` | `install.html` + `screenshot.png` + `steps/*.png` (install page and its step images) |
 | `dist/` | Built output (gitignored) |
 
 ## Dev environment
@@ -59,8 +59,9 @@ Real-data check: `gh api graphql --input <(node tools/print-query.mjs) > /tmp/da
 ## Build and release
 
 - `npm run package`: Web Store zip (`tools/package-extension.sh`, only files Chrome reads).
-- `npm run dist`: `dist/` with install page, screenshot and zip.
+- `npm run dist`: `dist/` with install page, screenshot, step images and zip.
 - `node tools/make-screenshot.mjs`: regenerate `docs/screenshot.png` from fixture data.
+- `node tools/make-install-images.mjs`: regenerate the install page's step images (`docs/steps/`) from a real Chromium; rerun after changing chrome://extensions-facing steps, Settings or the helper section.
 - `node tools/make-icons.mjs`: regenerate PNGs after editing `icons/icon.svg`.
 - Releases bump `version` in both `manifest.json` and `package.json` together; commit subject style `vX.Y.Z: <summary>`.
 

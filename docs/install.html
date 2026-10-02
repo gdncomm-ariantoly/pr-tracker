@@ -74,6 +74,9 @@
 
   figure { margin: 0; display: grid; gap: 8px; }
   figure img { display: block; width: 100%; border-radius: 10px; border: 1px solid var(--rule); background: var(--paper); }
+  figure.shot { max-width: 520px; }
+  figure.shot img { height: auto; border-radius: 8px; }
+  figure.shot figcaption { font-size: .85rem; color: var(--muted); }
   figcaption { font-size: .85rem; color: var(--muted); }
 
   /* what it tells you */
@@ -208,11 +211,15 @@
         <div class="detail">
           <p>Paste this into the address bar (Chrome won't open it from a link). Then turn on the <strong>Developer mode</strong> switch in the top right.</p>
           <span class="copy"><span id="c-ext">chrome://extensions</span><button type="button" data-copy="c-ext">Copy</button></span>
+          <figure class="shot"><img src="steps/developer-mode.png" width="760" height="460" loading="lazy" alt="The chrome://extensions page with the Developer mode switch in the top right circled and switched on."></figure>
         </div>
       </li>
       <li>
         <h3>Click Load unpacked and choose the folder</h3>
-        <div class="detail"><p>Pick the folder that contains <code>manifest.json</code>. A "PR Tracker" card appears.</p></div>
+        <div class="detail">
+          <p>Pick the folder that contains <code>manifest.json</code>. A "PR Tracker" card appears.</p>
+          <figure class="shot"><img src="steps/load-unpacked.png" width="760" height="460" loading="lazy" alt="The Load unpacked button circled at the top left of chrome://extensions, with the PR Tracker card below it once loaded."></figure>
+        </div>
       </li>
       <li>
         <h3>Pin it to the toolbar</h3>
@@ -241,6 +248,7 @@
         <h3>Paste it into PR Tracker</h3>
         <div class="detail">
           <p>Click the toolbar icon. Settings opens as a pop-up the first time. Paste the token (it starts with <code>github_pat_</code>) and click <strong>Save</strong>.</p>
+          <figure class="shot"><img src="steps/paste-token.png" width="900" height="560" loading="lazy" alt="PR Tracker's Settings pop-up, with the GitHub token field at the top and the Save button at the bottom circled."></figure>
         </div>
       </li>
     </ol>
@@ -287,7 +295,7 @@
       </li>
       <li>
         <h3>Click Connect</h3>
-        <div class="detail"><p>In Settings → Claude Code helper, click <strong>Connect</strong> and allow Chrome's prompt. It should say <em>Connected</em>, and under Claude summaries: <em>Claude Code account: Team plan · … — summaries allowed</em>. PR cards now show <strong>Summarize with Claude</strong> and a <strong>Claude Code · n</strong> chip when a session touched the PR.</p></div>
+        <div class="detail"><p>In Settings → Claude Code helper, click <strong>Connect</strong> and allow Chrome's prompt. It should say <em>Connected</em>, and under Claude summaries: <em>Claude Code account: Team plan · … — summaries allowed</em>. PR cards now show <strong>Summarize with Claude</strong> and a <strong>Claude Code · n</strong> chip when a session touched the PR.</p><figure class="shot"><img src="steps/connect.png" width="666" height="259" loading="lazy" alt="Settings, Claude Code helper section: the Connect button circled, next to the status line and the install command with your extension id."><figcaption>The install command under it already has your extension id; yours differs from the one shown.</figcaption></figure></div>
       </li>
       <li>
         <h3>Optional: keep your tokens in the Keychain</h3>
