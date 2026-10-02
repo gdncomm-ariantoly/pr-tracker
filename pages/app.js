@@ -4,7 +4,7 @@ import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { judgeOnePR, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
-import { readings } from '../lib/signals.js'
+import { readings, TIER_LABEL, worstTier } from '../lib/signals.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { resumeCommand } from '../lib/sessions.js'
 import { claudeCode, helperInfo, localSessions, nativeAllowed, secrets, SUMMARY_HELPER } from '../platform.js'
@@ -106,32 +106,100 @@ function retick() {
     const text = (e.dataset.agoPrefix ?? '') + ago(e.dataset.ago ?? '')
     if (e.textContent !== text) e.textContent = text
   }
-  // "No review · 8h" and cycle time keep counting too.
-  for (const row of document.querySelectorAll('.signals:not([hidden])')) {
-    const facts = signalFacts.get(row)
-    if (facts) paintSignals(/** @type {HTMLElement} */ (row), facts)
+  // "No review · 8h" and cycle time keep counting, so the buttons' colour and an open pop-up do too.
+  for (const btn of document.querySelectorAll('.sig-open')) {
+    const pr = signalsPR.get(btn)
+    if (pr?.signals) tintSignals(/** @type {HTMLElement} */ (btn), pr.signals)
+  }
+  if (signalsDialog.open && shownSignals?.signals) paintSignalsDialog(shownSignals)
+}
+
+const TIER_CLASS = { ELITE: 't-elite', HIGH: 't-high', MEDIUM: 't-medium', NEEDS_FOCUS: 't-focus', NO_ACTIVITY: 't-none' }
+const signalsDialog = /** @type {HTMLDialogElement} */ (document.getElementById('signals-dialog'))
+/** @type {WeakMap<Element, ReviewPR>} */
+const signalsPR = new WeakMap()
+/** @type {ReviewPR | null} */
+let shownSignals = null
+
+/** The card's OrgSignals button, coloured by the PR's weakest tier. @param {ReviewPR & {signals: import('../lib/signals.js').SignalsFacts}} pr */
+function signalsButton(pr) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.textContent = 'OrgSignals'
+  signalsPR.set(btn, pr)
+  tintSignals(btn, pr.signals)
+  btn.addEventListener('click', (event) => {
+    event.preventDefault() // inside <summary>: don't toggle the card
+    event.stopPropagation()
+    openSignals(pr)
+  })
+  return btn
+}
+
+/** @param {HTMLElement} btn @param {import('../lib/signals.js').SignalsFacts} facts */
+function tintSignals(btn, facts) {
+  const list = readings(facts)
+  const worst = worstTier(list)
+  btn.className = `chip sig-open ${TIER_CLASS[worst]}`
+  btn.dataset.tier = worst
+  const weak = list.filter((r) => r.tier === 'NEEDS_FOCUS').map((r) => r.label)
+  btn.title = weak.length ? `OrgSignals — needs focus: ${weak.join(', ')}` : `OrgSignals — weakest tier: ${TIER_LABEL[worst]}`
+}
+
+/** @param {ReviewPR} pr */
+function openSignals(pr) {
+  shownSignals = pr
+  paintSignalsDialog(pr)
+  if (!signalsDialog.open) signalsDialog.showModal()
+}
+
+/** @param {ReviewPR} pr */
+function paintSignalsDialog(pr) {
+  const link = /** @type {HTMLAnchorElement} */ ($('signals-pr'))
+  link.textContent = `${pr.repo}#${pr.number} ${pr.title}`
+  link.href = pr.url
+  const rows = $('signals-rows')
+  rows.replaceChildren()
+  for (const r of pr.signals ? readings(pr.signals) : []) {
+    const li = document.createElement('li')
+    li.className = 'sig-row'
+    li.dataset.metric = r.key
+    const name = document.createElement('span')
+    name.className = 'sig-name'
+    name.textContent = r.label
+    const means = document.createElement('span')
+    means.className = 'sig-means'
+    means.textContent = r.means
+    const val = document.createElement('span')
+    val.className = 'sig-val'
+    const value = document.createElement('strong')
+    value.textContent = r.value
+    const tier = document.createElement('span')
+    tier.className = `chip ${TIER_CLASS[r.tier]}`
+    tier.textContent = TIER_LABEL[r.tier]
+    val.append(value, tier)
+    if (r.note) {
+      const note = document.createElement('span')
+      note.className = 'note'
+      note.textContent = r.note
+      val.append(note)
+    }
+    const scale = document.createElement('span')
+    scale.className = 'sig-scale'
+    scale.textContent = r.scale
+    li.append(name, val, means, scale)
+    rows.append(li)
   }
 }
 
-/** @type {WeakMap<Element, import('../lib/signals.js').SignalsFacts>} */
-const signalFacts = new WeakMap()
-
-const TIER_CLASS = { ELITE: 't-elite', HIGH: 't-high', MEDIUM: 't-medium', NEEDS_FOCUS: 't-focus', NO_ACTIVITY: 't-none' }
-
-/** OrgSignals chips for one PR. @param {HTMLElement} row @param {import('../lib/signals.js').SignalsFacts} facts */
-function paintSignals(row, facts) {
-  signalFacts.set(row, facts)
-  const label = row.querySelector('.sig-label')
-  row.replaceChildren(...(label ? [label] : []))
-  for (const r of readings(facts)) {
-    const c = document.createElement('span')
-    c.className = `chip sig ${TIER_CLASS[r.tier]}`
-    c.dataset.metric = r.key
-    c.textContent = r.text
-    c.title = r.title
-    row.append(c)
-  }
-  row.hidden = false
+$('signals-close').addEventListener('click', () => signalsDialog.close())
+signalsDialog.addEventListener('close', () => (shownSignals = null))
+{
+  let pressedOutside = false
+  signalsDialog.addEventListener('pointerdown', (event) => (pressedOutside = event.target === signalsDialog))
+  signalsDialog.addEventListener('click', (event) => {
+    if (pressedOutside && event.target === signalsDialog) signalsDialog.close()
+  })
 }
 setInterval(retick, 30_000)
 // Timers are throttled in a background tab: catch up as soon as it's back.
@@ -546,9 +614,6 @@ function renderPR(pr, viewer, showRepo) {
     ccList.append(row)
   }
 
-  const signalsRow = /** @type {HTMLElement} */ (el.querySelector('.signals'))
-  if (state.showSignals && pr.signals) paintSignals(signalsRow, pr.signals)
-
   const tally = /** @type {HTMLElement} */ (el.querySelector('.tally'))
   if (!pr.hasHumanComments) {
     tally.append(chip('No human comments', 'c-muted'))
@@ -578,6 +643,7 @@ function renderPR(pr, viewer, showRepo) {
       list.append(renderFinding(f, viewer))
     }
   }
+  if (state.showSignals && pr.signals) tally.append(signalsButton(/** @type {ReviewPR & {signals: import('../lib/signals.js').SignalsFacts}} */ (pr)))
   tally.append(refreshButton(pr))
   return el
 }

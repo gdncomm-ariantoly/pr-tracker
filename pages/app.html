@@ -20,9 +20,23 @@
 
     <div class="layout" id="layout">
     <div class="content">
-    <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+    <dialog class="modal signals-dialog" id="signals-dialog" aria-labelledby="signals-title">
+      <div class="modal-body">
+        <div class="modal-head">
+          <div class="modal-title">
+            <h2 id="signals-title">OrgSignals</h2>
+            <a id="signals-pr" target="_blank" rel="noopener"></a>
+          </div>
+          <button type="button" class="close" id="signals-close" aria-label="Close OrgSignals" title="Close (Esc)">×</button>
+        </div>
+        <ul class="sig-list" id="signals-rows"></ul>
+        <p class="muted sig-foot">Where this PR lands on each metric OrgSignals scores, computed from GitHub the way the growth-signals <em>sprint-score</em> skill does, so it can differ slightly from OrgSignals. Your sprint score is the P75 across your PRs (the value 3 of 4 are at or below), so one weak PR is a hint, not your score. Shown only for the team's tracked repos merging into <code>master</code> or <code>release/*</code>; never deployment (prod / nonprod) repos.</p>
+      </div>
+    </dialog>
+
+    <dialog class="modal settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
     <form class="settings" id="settings">
-      <div class="settings-head">
+      <div class="modal-head">
         <h2 id="settings-title">Settings</h2>
         <button type="button" class="close" id="settings-close" aria-label="Close settings" title="Close (Esc)">×</button>
       </div>
@@ -87,7 +101,7 @@
       <label class="check">
         <input type="checkbox" id="signals" />
         Show OrgSignals metrics on each PR
-        <small class="muted">PR size, coding time, commits after the PR was raised, time to first comment, comment count and cycle time so far, coloured by OrgSignals tier (Elite, High, Medium, Needs focus). Only on PRs OrgSignals scores: the team's tracked repos, merging into <code>master</code> or <code>release/*</code> — never deployment (nonprod / prod) repos. Computed from GitHub like the growth-signals <em>sprint-score</em> skill, so it can differ slightly from OrgSignals.</small>
+        <small class="muted">An <em>OrgSignals</em> button on the PR, coloured by its weakest tier, opens PR size, coding time, commits after the PR was raised, time to first comment, comment count and cycle time so far, each with its OrgSignals tier (Elite, High, Medium, Needs focus). Only on PRs OrgSignals scores: the team's tracked repos, merging into <code>master</code> or <code>release/*</code> — never deployment (nonprod / prod) repos. Computed from GitHub like the growth-signals <em>sprint-score</em> skill, so it can differ slightly from OrgSignals.</small>
       </label>
       <label class="check">
         <input type="checkbox" id="notify" />
@@ -155,7 +169,6 @@
               <div class="approvals" hidden></div>
             </div>
             <div class="tally"></div>
-            <div class="signals" hidden><span class="sig-label" title="OrgSignals metrics for this PR, computed from GitHub as the growth-signals sprint-score skill does. Hover a chip for its tiers.">OrgSignals</span></div>
             <p class="ai-summary" hidden><span class="ai-mark" title="Summary by Claude">Claude</span><span class="ai-summary-text"></span><span class="ai-stale" title="The PR's comments, replies or commits changed after this summary" hidden>Outdated</span><button type="button" class="ai-ask" hidden>Summarize</button></p>
           </summary>
           <section class="cc-sessions" hidden>

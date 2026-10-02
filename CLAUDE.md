@@ -28,7 +28,7 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `lib/signals.js` | OrgSignals per-PR metrics: scope (team repos, `master`/`release/*`, never `prod-`/`nonprod-` deployment repos), tiers and bot rule copied from growth-signals `sprint-score` `scoring.json` |
 | `lib/sessions.js` | PR ↔ Claude Code session links (comment marker + helper scan) |
 | `lib/store.js` | Settings, snapshot, caches in `chrome.storage.local` (storage area is an argument for tests) |
-| `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings is a modal `<dialog>` (`#settings-dialog`), with its own error line `#settings-error` since the page banner sits behind it |
+| `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings (`#settings-dialog`, with its own error line `#settings-error` since the page banner sits behind it) and OrgSignals (`#signals-dialog`, opened from a card's `.sig-open` button) are modal `<dialog>`s sharing the `.modal` styles |
 | `pages/markdown.js` | Renders GitHub `bodyHTML` through an allowlist, parsed inert; never trust remote HTML |
 | `native/` | Local native-messaging helper: `host.mjs` (sessions scan, runs `claude -p` with no tools), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` |
 | `tests/` | `node --test` unit tests, `tests/fixtures/` sample GraphQL data |

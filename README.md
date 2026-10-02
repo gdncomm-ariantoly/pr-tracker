@@ -71,19 +71,19 @@ Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployme
 
 ### OrgSignals metrics
 
-Every PR that OrgSignals (Signals AI) scores gets a row of chips under its tally, coloured by tier — green Elite, blue High, yellow Medium, red Needs focus, gray No activity — with the tier scale in each chip's tooltip:
+Every PR that OrgSignals (Signals AI) scores gets an **OrgSignals** button next to its comment count, coloured by the PR's weakest tier — green Elite, blue High, yellow Medium, red Needs focus, gray No activity; hovering it names the metrics that need focus. Clicking it opens a pop-up with one row per metric: this PR's value, its tier and the tier scale. Esc, × or a click outside closes it; values that depend on the time (no review yet, cycle time) keep counting while it's open.
 
-| Chip | Metric | Elite |
+| Row value | Metric | Elite |
 |---|---|---|
-| Size 320 | PR size: additions + deletions | ≤ 250 lines |
-| Coding 3h | Coding time: first authored commit → PR opened | ≤ 2 h |
-| 2 after open | Commits after PR raised (merge commits included) | ≤ 1 |
-| 1st review 2h / No review · 8h | Time to first comment: opened → first review or inline comment by someone else (conversation comments don't count); while nobody has looked, the clock keeps running | ≤ 6 h |
-| 3 comments | Comment count per PR: reviews + inline + conversation comments by other people (0 scores *No activity*) | 1–5 |
-| Cycle 23h | Cycle time if merged now: first commit → now | ≤ 27 h |
-| Unreviewed | Nobody else has reviewed it yet; merged like this it counts against *Unreviewed PRs merged* | — |
+| 320 lines | PR size: additions + deletions | ≤ 250 lines |
+| 3h | Coding time: first authored commit → PR opened | ≤ 2 h |
+| 2 commits | Commits after PR raised (merge commits included) | ≤ 1 |
+| 2h, or 8h *no review yet* | Time to first comment: opened → first review or inline comment by someone else (conversation comments don't count); while nobody has looked, the clock keeps running | ≤ 6 h |
+| 3 | Comment count per PR: reviews + inline + conversation comments by other people (0 scores *No activity*) | 1–5 |
+| 23h *so far* | Cycle time if merged now: first commit → now | ≤ 27 h |
+| No review | Nobody else has reviewed it yet; merged like this it counts against *Unreviewed PRs merged* | — |
 
-**Which PRs.** Only those OrgSignals scores: the team's tracked repos (56, from the OrgSignals team settings) merging into `master` or `release/*`. Deployment repos — `prod-…`, `nonprod-…` (Rundeck, infra, deploy) and `*-deployment-*` — never get chips, nor do other squads' repos or PRs into other branches. The rules are computed from GitHub the way the growth-signals *sprint-score* skill does it (bots, Jenkins and deleted accounts never count as reviewers; the page's own *Extra bot logins* don't apply), so they can differ slightly from OrgSignals' own numbers. OrgSignals scores a sprint by the P75 of these per-PR values, so a red chip on one PR is a hint, not your score. The repo list and tier bounds are copied into `lib/signals.js`; update them when the lead changes the team settings. Switch off in Settings → *Show OrgSignals metrics on each PR*.
+**Which PRs.** Only those OrgSignals scores: the team's tracked repos (56, from the OrgSignals team settings) merging into `master` or `release/*`. Deployment repos — `prod-…`, `nonprod-…` (Rundeck, infra, deploy) and `*-deployment-*` — never get the button, nor do other squads' repos or PRs into other branches. The rules are computed from GitHub the way the growth-signals *sprint-score* skill does it (bots, Jenkins and deleted accounts never count as reviewers; the page's own *Extra bot logins* don't apply), so they can differ slightly from OrgSignals' own numbers. OrgSignals scores a sprint by the P75 of these per-PR values, so a red button on one PR is a hint, not your score. The repo list and tier bounds are copied into `lib/signals.js`; update them when the lead changes the team settings. Switch off in Settings → *Show OrgSignals metrics on each PR*.
 
 ### Layout
 

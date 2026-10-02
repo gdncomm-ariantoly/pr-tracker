@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { analyzePR } from '../lib/analyze.js'
-import { formatHours, inScope, isSignalsBot, prSignals, readings, tierOf } from '../lib/signals.js'
+import { formatHours, inScope, isSignalsBot, prSignals, readings, tierOf, worstTier } from '../lib/signals.js'
 
 const H = 3_600_000
 const at = (/** @type {number} */ hours) => new Date(Date.UTC(2026, 8, 28, 0) + hours * H).toISOString()
@@ -116,6 +116,15 @@ describe('readings', () => {
     assert.equal(r.time_to_first_comment.text, '1st review 2h')
     assert.equal(r.cycle_time.text, 'Cycle 23h')
     assert.match(r.cycle_time.title, /if merged now/)
+    assert.equal(r.pr_size.value, '320 lines')
+    assert.match(r.pr_size.scale, /^Elite ≤ 250 lines, High ≤ 400 lines, Medium ≤ 600 lines/)
+    assert.equal(r.cycle_time.value, '23h')
+    assert.equal(r.cycle_time.note, 'so far · if merged now')
+  })
+  it('the button takes the weakest tier', () => {
+    assert.equal(worstTier(readings(f, Date.parse(at(30)))), 'HIGH')
+    assert.equal(worstTier(readings(f, Date.parse(at(300)))), 'NEEDS_FOCUS')
+    assert.equal(worstTier([]), 'ELITE')
   })
   it('no review yet: the clock keeps running, and merging now would count as unreviewed', () => {
     const lonely = /** @type {import('../lib/signals.js').SignalsFacts} */ (prSignals(pr({ reviews: { nodes: [] }, reviewThreads: { nodes: [] }, comments: { nodes: [] } })))
@@ -124,9 +133,15 @@ describe('readings', () => {
     assert.equal(r.time_to_first_comment.tier, 'NEEDS_FOCUS')
     assert.equal(r.comment_count_per_pr.tier, 'NO_ACTIVITY')
     assert.equal(r.unreviewed_prs_merged.text, 'Unreviewed')
+    assert.equal(r.time_to_first_comment.value, '40h')
+    assert.equal(r.time_to_first_comment.note, 'no review yet · if someone reviews now')
+    const late = byKey(readings(lonely, Date.parse(at(300))))
+    assert.equal(late.cycle_time.value, '12d')
+    assert.equal(late.cycle_time.note, 'so far · 293h · if merged now', 'OrgSignals counts hours: say how many')
   })
   it('hours read short', () => {
     assert.equal(formatHours(0.2), '12m')
+    assert.equal(formatHours(0.9999), '1h', 'never "60m"')
     assert.equal(formatHours(5.25), '5.3h')
     assert.equal(formatHours(99.94), '99.9h')
     assert.equal(formatHours(241.04), '10d')

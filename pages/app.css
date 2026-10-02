@@ -59,25 +59,27 @@ button:disabled { opacity: .6; cursor: default; }
 .bar h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; }
 .bar h1 .logo { width: 24px; height: 24px; flex: none; }
 
-/* Settings is a modal <dialog>; the form fills it, so a click that lands on the
-   dialog element itself is a click on the backdrop. */
-.settings-dialog {
+/* Settings and OrgSignals are modal <dialog>s; the content fills the dialog,
+   so a click that lands on the dialog element itself is a click on the backdrop. */
+.modal {
   width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
   padding: 0; overflow: auto; overscroll-behavior: contain;
   background: var(--card); color: var(--fg);
   border: 1px solid var(--line); border-radius: 12px;
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
 }
-.settings-dialog::backdrop { background: rgb(0 0 0 / 0.45); }
-body:has(.settings-dialog[open]) { overflow: hidden; }
-.settings { padding: 0 20px; display: grid; gap: 12px; }
-.settings-head, .settings-foot {
+.modal::backdrop { background: rgb(0 0 0 / 0.45); }
+body:has(.modal[open]) { overflow: hidden; }
+.settings, .modal-body { padding: 0 20px; display: grid; gap: 12px; }
+.modal-head, .settings-foot {
   position: sticky; z-index: 1; background: var(--card);
   margin: 0 -20px; padding: 12px 20px;
 }
-.settings-head { top: 0; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
-.settings-head h2 { margin: 0; font-size: 16px; }
-.settings-head .close { font-size: 20px; line-height: 1; padding: 2px 10px; }
+.modal-head { top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { margin: 0; font-size: 16px; }
+.modal-head .close { font-size: 20px; line-height: 1; padding: 2px 10px; flex: none; }
+.modal-title { min-width: 0; display: grid; gap: 2px; }
+.modal-title a { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .settings-foot { bottom: 0; border-top: 1px solid var(--line); }
 .settings .banner { margin: 0; }
 .settings label { display: grid; gap: 4px; font-weight: 600; }
@@ -125,6 +127,8 @@ details.stale > summary::before { content: "▸"; }
 details.stale[open] > summary::before { content: "▾"; }
 details.stale[open] > summary { margin-bottom: 8px; }
 details.stale .pr { opacity: .8; }
+/* <details> lays its content out in a slot, so the group's grid gap never reaches the cards. */
+details.stale > .pr + .pr { margin-top: 8px; }
 .empty { text-align: center; padding: 24px; }
 
 .pr { background: var(--card); border: 1px solid var(--line); border-radius: 8px; min-width: 0; overflow: hidden; } /* nothing inside may widen the list into the Updates panel */
@@ -164,10 +168,20 @@ details.stale .pr { opacity: .8; }
 .ap-bad { color: var(--bad-fg); } .ap-bad::before { content: "✕"; }
 .ap-wait { color: var(--warn-fg); } .ap-wait::before { content: "◷"; }
 
-.signals { display: flex; gap: 4px 6px; flex-wrap: wrap; align-items: center; flex: 1 0 100%; padding-left: 18px; }
-.sig-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-right: 2px; }
-.chip.sig { font-size: 11.5px; padding: 0 7px; cursor: help; }
-.chip.sig::before { content: "●"; margin-right: 4px; font-size: 8px; vertical-align: 1px; }
+.sig-open { font: inherit; font-size: 12px; padding: 1px 8px; border: 0; cursor: pointer; }
+.sig-open::before { content: "●"; margin-right: 4px; font-size: 8px; vertical-align: 1px; }
+.sig-open:hover { text-decoration: underline; }
+.sig-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 0; }
+.sig-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.sig-row:last-child { border-bottom: 0; }
+.sig-name { font-weight: 600; }
+.sig-means, .sig-scale { font-size: 12px; color: var(--muted); }
+.sig-means { grid-column: 1; }
+.sig-val { grid-column: 2; grid-row: 1 / span 2; max-width: 14em; display: grid; justify-items: end; align-content: start; gap: 4px; text-align: right; }
+.sig-val strong { font-size: 15px; }
+.sig-val .note { font-size: 11.5px; color: var(--muted); }
+.sig-scale { grid-column: 1 / -1; }
+.sig-foot { font-size: 12px; margin: 0 0 16px; }
 .chip.t-elite { background: var(--ok-bg); color: var(--ok-fg); }
 .chip.t-high { background: var(--info-bg); color: var(--info-fg); }
 .chip.t-medium { background: var(--warn-bg); color: var(--warn-fg); }
