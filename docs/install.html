@@ -228,13 +228,15 @@
       <li>
         <h3>Create a fine-grained token for gdncomm</h3>
         <div class="detail">
-          <p>Open the link below. It pre-fills the name, <strong>Resource owner = gdncomm</strong>, and read-only access to <strong>Pull requests</strong>, <strong>Contents</strong> and <strong>Commit statuses</strong>. You still need to pick the repository access yourself:</p>
+          <p>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new ↗</a> (GitHub → your avatar → Settings → Developer settings → Personal access tokens → Fine-grained tokens → <strong>Generate new token</strong>) and fill in:</p>
           <ul class="plain">
+            <li><strong>Token name:</strong> anything, e.g. <em>PR Tracker</em></li>
+            <li><strong>Resource owner:</strong> gdncomm (not your personal account)</li>
+            <li><strong>Expiration:</strong> anything our org policy allows, e.g. 90 days</li>
             <li><strong>Repository access:</strong> All repositories</li>
-            <li><strong>Permissions:</strong> Pull requests, Contents and Commit statuses, all Read-only (Metadata: Read-only is added automatically). Commit statuses is what shows the Jenkins build.</li>
-            <li><strong>Expiration:</strong> 90 days is pre-filled. Choose anything our org policy allows.</li>
+            <li><strong>Permissions → Repository permissions:</strong> Pull requests, Contents and Commit statuses, each <strong>Read-only</strong> (Metadata: Read-only is added automatically). Commit statuses is what shows the Jenkins build.</li>
           </ul>
-          <p><a href="https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&amp;description=Read-only+PR+dashboard&amp;target_name=gdncomm&amp;expires_in=90&amp;pull_requests=read&amp;contents=read&amp;statuses=read" target="_blank" rel="noopener">Create a fine-grained token for gdncomm ↗</a></p>
+          <p>Click <strong>Generate token</strong> and copy it right away: GitHub shows it only once.</p>
           <p>If gdncomm doesn't appear under Resource owner, sign in to the org's SSO on github.com first, then reload the page.</p>
         </div>
       </li>

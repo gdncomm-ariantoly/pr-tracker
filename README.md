@@ -132,9 +132,12 @@ After changing `manifest.json` or `background.js`, click the card's reload arrow
 
 ## Setup
 
-1. Create a **fine-grained** token with Resource owner **gdncomm** ([pre-filled link](https://github.com/settings/personal-access-tokens/new?name=PR+Tracker&description=Read-only+PR+dashboard&target_name=gdncomm&expires_in=90&pull_requests=read&contents=read&statuses=read)):
+1. Create a **fine-grained** token at [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) (GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → *Generate new token*):
+   - Token name: anything, e.g. *PR Tracker*; Expiration: whatever the org policy allows
+   - Resource owner: **gdncomm** (not your personal account)
    - Repository access: **All repositories**
-   - Permissions: **Pull requests**, **Contents** and **Commit statuses**, all Read-only (Metadata is automatic). Commit statuses is what shows the Jenkins build.
+   - Repository permissions: **Pull requests**, **Contents** and **Commit statuses**, all Read-only (Metadata is automatic). Commit statuses is what shows the Jenkins build.
+   - *Generate token* and copy it: GitHub shows it only once.
 2. If the org requires approval, wait until the token is no longer **pending**. No "Configure SSO" step is needed for fine-grained tokens.
 3. Click the toolbar icon: Settings opens as a pop-up the first time (later: **Settings**, top right; Esc or × closes it). Paste the token → **Save**.
 
