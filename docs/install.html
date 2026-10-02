@@ -177,6 +177,7 @@
         <p>Your open PRs. Each one either says "No human comments" or shows how many comments are fixed and how many aren't.</p>
         <p>Each card says who has <strong>approved</strong>, who asked for <strong>changes</strong>, and whose review you're still <strong>waiting on</strong>, people and teams by name.</p>
         <p>Each PR shows its latest <strong>Jenkins build</strong> (passed, failed, running) and links to it, in whichever team folder holds the repo (TRFCEE, SEO, …). Deployment repos (<code>prod-*</code>, <code>nonprod-*</code>) link to their prod or non-prod Jenkins instead; test-automation repos (<code>cucumber-*</code>) show no Jenkins at all.</p>
+        <p>PRs into a <code>release/*</code> branch of the team's tracked repos get an <strong>OrgSignals</strong> button, coloured by their weakest tier. It opens that PR's PR size, coding time, commits after opening, time to first comment, comment count and cycle time so far, each rated Elite, High, Medium or Needs focus, the way OrgSignals scores them.</p>
         <p>Both tabs are grouped by service, with PRs that have unfixed comments first, then PRs with other comments, then the rest, newest first; deployment repos come last. PRs with no activity for over a week collapse into a <strong>Stale</strong> group at the bottom.</p>
       </div>
       <div class="fact">
@@ -239,7 +240,7 @@
       <li>
         <h3>Paste it into PR Tracker</h3>
         <div class="detail">
-          <p>Click the toolbar icon. Settings opens the first time. Paste the token (it starts with <code>github_pat_</code>) and click <strong>Save</strong>.</p>
+          <p>Click the toolbar icon. Settings opens as a pop-up the first time. Paste the token (it starts with <code>github_pat_</code>) and click <strong>Save</strong>.</p>
         </div>
       </li>
     </ol>
@@ -383,6 +384,10 @@
         <div><p>GitHub hides which team from fine-grained tokens without organization access. Adding <strong>Organization permissions → Members: Read-only</strong> to the token should reveal it.</p></div>
       </details>
       <details>
+        <summary>A PR has no OrgSignals button</summary>
+        <div><p>OrgSignals only scores PRs in the team's tracked repos that merge into a <code>release/*</code> branch, so the button only shows there. PRs into <code>master</code> or <code>develop</code>, deployment repos (<code>prod-*</code>, <code>nonprod-*</code>) and other squads' repos get none. You can also switch it off in Settings → <em>Show OrgSignals metrics on each PR</em>. The values are worked out from GitHub, so they can differ slightly from OrgSignals itself.</p></div>
+      </details>
+      <details>
         <summary>A bot account shows up as a person</summary>
         <div><p>Some CI accounts are regular user accounts. Add their logins under <strong>Extra bot logins</strong> in Settings.</p></div>
       </details>
@@ -400,7 +405,7 @@
           <tr><td><code>notifications</code></td><td>Desktop alerts for updates</td></tr>
           <tr><td><code>api.github.com</code></td><td>Read-only GraphQL queries that fetch your PRs</td></tr>
           <tr><td><code>*.gdn-app.com</code> (optional)</td><td>Only once you add a Jenkins API token: lists team folders and reads each PR's last Jenkins build with it</td></tr>
-          <tr><td><code>nativeMessaging</code> (optional)</td><td>Only after Connect: talks to the local Claude Code helper, which reads session metadata from <code>~/.claude/projects</code> when you Summarize, runs <code>claude -p</code> with no tools, and, if you choose, keeps your tokens in the macOS Keychain</td></tr>
+          <tr><td><code>nativeMessaging</code> (optional)</td><td>Only after Connect: talks to the local Claude Code helper, which reads session metadata from <code>~/.claude/projects</code> on each refresh, runs <code>claude -p</code> with no tools when you click Summarize (company plan only), and, if you choose, keeps your tokens in the macOS Keychain</td></tr>
         </tbody>
       </table>
     </div>

@@ -30,7 +30,7 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `lib/store.js` | Settings, snapshot, caches in `chrome.storage.local` (storage area is an argument for tests) |
 | `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings (`#settings-dialog`, with its own error line `#settings-error` since the page banner sits behind it) and OrgSignals (`#signals-dialog`, opened from a card's `.sig-open` button) are modal `<dialog>`s sharing the `.modal` styles |
 | `pages/markdown.js` | Renders GitHub `bodyHTML` through an allowlist, parsed inert; never trust remote HTML |
-| `native/` | Local native-messaging helper: `host.mjs` (sessions scan, runs `claude -p` with no tools), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` |
+| `native/` | Local native-messaging helper: `host.mjs` (sessions scan; runs `claude -p` with no tools, only after `claude auth status` shows a Team/Enterprise plan or Bedrock/Vertex; Keychain `secret-get/set/delete` via `/usr/bin/security`), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` (writes the gitignored `host-run.sh` launcher and the Chrome host manifest) |
 | `tests/` | `node --test` unit tests, `tests/fixtures/` sample GraphQL data |
 | `tools/` | Browser verification (Playwright), packaging, icon and screenshot generation; `tools/fixture.mjs` replays the sample data with its dates moved to today so it never goes Stale |
 | `docs/` | `install.html` + `screenshot.png` (install page) |
@@ -76,4 +76,5 @@ Real-data check: `gh api graphql --input <(node tools/print-query.mjs) > /tmp/da
 
 - The GitHub token is fine-grained, read-only; the extension only reads.
 - Jenkins API tokens carry the user's full Jenkins rights; only read with them.
-- Claude runs through the local helper with all tools off, no settings/MCP, no session persistence; it sends comment text, file paths and commit messages to Anthropic.
+- Claude runs through the local helper with all tools off, no settings/MCP, no session persistence, and only when the user clicks Summarize; the helper refuses personal (Pro/Max/free) plans. It sends comment text, file paths and commit messages to Anthropic.
+- Tests must never touch the user's real install: the installer test runs on a copy of `native/`, and Keychain tests use a throwaway service name.
