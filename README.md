@@ -114,6 +114,8 @@ Clicking a notification opens that comment on GitHub. More than 4 updates at onc
 
 ## Install
 
+> **Full step-by-step guide:** [`docs/install.html`](docs/install.html) walks through every step below in more detail, with screenshots, troubleshooting (empty lists, SAML, 401, missing builds, notifications) and what each permission is for. Open the built copy in a browser: run `npm run dist`, then open `dist/install.html` (it sits next to the zip, ready to share). GitHub shows the `.html` file as source, not as a page.
+
 No build step — the extension is plain ES modules and loads as it sits. Keep the folder somewhere permanent (e.g. `~/chrome-extensions/pr-tracker`): Chrome loads it from there on every launch.
 
 1. Open `chrome://extensions` (paste it into the address bar) and turn on **Developer mode**, top right.
