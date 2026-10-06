@@ -101,7 +101,7 @@ export async function claudeAccount(bin = findClaude()) {
 
 /**
  * @param {string} bin @param {string[]} args @param {string} input @param {number} timeoutMs
- * @returns {Promise<{code: number | null, signal: string | null, stdout: string, stderr: string}>}
+ * @returns {Promise<{code: number | null, signal: string | null, stdout: string, stderr: string, timedOut: boolean}>}
  */
 function run(bin, args, input, timeoutMs) {
   return new Promise((resolve) => {
@@ -109,13 +109,18 @@ function run(bin, args, input, timeoutMs) {
     const child = spawn(bin, args, { cwd: tmpdir(), stdio: ['pipe', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
-    const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs)
+    let timedOut = false
+    // claude catches SIGTERM and exits 143 by itself, so `signal` stays null: remember that we sent it.
+    const timer = setTimeout(() => {
+      timedOut = true
+      child.kill('SIGTERM')
+    }, timeoutMs)
     child.stdout.on('data', (d) => (stdout += d))
     child.stderr.on('data', (d) => (stderr += d))
-    child.on('error', (e) => resolve({ code: -1, signal: null, stdout, stderr: String(e) }))
+    child.on('error', (e) => resolve({ code: -1, signal: null, stdout, stderr: String(e), timedOut }))
     child.on('close', (code, signal) => {
       clearTimeout(timer)
-      resolve({ code, signal, stdout, stderr })
+      resolve({ code, signal, stdout, stderr, timedOut })
     })
     child.stdin.end(input)
   })
@@ -129,9 +134,10 @@ export function judgeArgs(/** @type {{model: string, system: string, schema: obj
 /**
  * @param {any} request
  * @param {string | null} [bin]
+ * @param {number} [timeoutMs]
  * @returns {Promise<{ok: true, output: unknown} | {ok: false, error: string}>}
  */
-export async function judge(request, bin = findClaude()) {
+export async function judge(request, bin = findClaude(), timeoutMs = JUDGE_TIMEOUT_MS) {
   const { model, system, schema, prompt } = request ?? {}
   if (typeof model !== 'string' || !/^claude-[a-z0-9-]{1,40}$/.test(model)) return { ok: false, error: 'bad model' }
   if (typeof system !== 'string' || typeof prompt !== 'string' || !schema || typeof schema !== 'object') return { ok: false, error: 'bad request' }
@@ -140,8 +146,10 @@ export async function judge(request, bin = findClaude()) {
   // Checked on every run, here in the helper: the page can't skip it.
   const account = await claudeAccount(bin)
   if (!account.ok) return { ok: false, error: account.reason }
-  const { code, signal, stdout, stderr } = await run(bin, judgeArgs({ model, system, schema }), prompt, JUDGE_TIMEOUT_MS)
-  if (signal) return { ok: false, error: 'Claude Code took too long' }
+  const { code, signal, stdout, stderr, timedOut } = await run(bin, judgeArgs({ model, system, schema }), prompt, timeoutMs)
+  if (timedOut) return { ok: false, error: `no answer within ${Math.round(timeoutMs / 60_000) || 1} min, so it was stopped. Try again; a very large PR or a slower model (Opus) takes longer.` }
+  // 143 = 128 + SIGTERM: stopped from outside (quit, logout, sleep) before it answered.
+  if (signal || code === 143 || code === 137) return { ok: false, error: `it was stopped before it answered (${signal ?? `exit ${code}`}). Try again.` }
   /** @type {any} */ let json = null
   try {
     json = JSON.parse(stdout)

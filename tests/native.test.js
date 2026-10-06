@@ -128,6 +128,23 @@ describe('judge via Claude Code', () => {
     assert.equal(accountPolicy(null).ok, false)
   })
 
+  it('says so when it had to stop a run that took too long, or something else stopped claude', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pr-tracker-judge-'))
+    try {
+      // Like the real CLI: catches SIGTERM and exits 143 itself, so no signal is reported.
+      const slow = path.join(dir, 'claude')
+      writeFileSync(slow, `#!/bin/sh\nif [ "$1" = auth ]; then printf '%s' '${TEAM}'; exit 0; fi\ncat > /dev/null\ntrap 'exit 143' TERM\nsleep 5 & wait\n`)
+      execFileSync('chmod', ['+x', slow])
+      const late = /** @type {any} */ (await judge(request, slow, 300))
+      assert.equal(late.ok, false)
+      assert.match(late.error, /^no answer within 1 min, so it was stopped/, 'not "claude exited 143"')
+      writeFileSync(slow, `#!/bin/sh\nif [ "$1" = auth ]; then printf '%s' '${TEAM}'; exit 0; fi\ncat > /dev/null\nexit 143\n`)
+      assert.match(/** @type {any} */ (await judge(request, slow)).error, /^it was stopped before it answered \(exit 143\)/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('passes on Claude Code errors (not logged in) and refuses odd requests', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-tracker-judge-'))
     try {
