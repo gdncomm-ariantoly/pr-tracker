@@ -65,6 +65,7 @@ try {
     if (headers.authorization !== GOOD) return route.fulfill({ status: 401, body: 'Invalid password/token' })
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jobs: [{ name: 'SEO', jobs: [{ name: 'api' }] }, { name: 'TRFCEE', jobs: [{ name: 'client-sdk' }] }] }) })
   })
+  let pr103Done = false
   await context.route(`${JENKINS}/**/lastBuild/api/json*`, async (route) => {
     const url = route.request().url()
     const headers = await route.request().allHeaders()
@@ -73,7 +74,7 @@ try {
     if (headers.authorization !== GOOD) return route.fulfill({ status: 401, body: 'Invalid password/token' })
     const json = (/** @type {object} */ b) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(b) })
     if (url.includes('/PR-101/')) return json({ number: 12, result: 'SUCCESS', building: false, url: `${JENKINS}/job/x/job/PR-101/12/`, timestamp: Date.now() - 60_000, duration: 30_000 })
-    if (url.includes('/PR-103/')) return json({ number: 4, result: null, building: true, url: `${JENKINS}/job/x/job/PR-103/4/` })
+    if (url.includes('/PR-103/')) return json(pr103Done ? { number: 4, result: 'SUCCESS', building: false, url: `${JENKINS}/job/x/job/PR-103/4/`, timestamp: Date.now() - 60_000, duration: 30_000 } : { number: 4, result: null, building: true, url: `${JENKINS}/job/x/job/PR-103/4/` })
     return route.fulfill({ status: 404, body: 'no job' })
   })
 
@@ -116,6 +117,24 @@ try {
   await page.click('#tab-toReview')
   await openStale()
   check('running build read from Jenkins', ((await chipOf(103).textContent()) ?? '') === 'Jenkins #4 running', (await chipOf(103).textContent()) ?? '')
+  // The build finishes; the background refresh (the alarm, in the worker) must pick it up.
+  pr103Done = true
+  const fetchedBefore = await page.evaluate(async () => /** @type {any} */ ((await chrome.storage.local.get('snapshot')).snapshot)?.fetchedAt)
+  await sw.evaluate(() => chrome.alarms.create('refresh', { when: Date.now() + 200 }))
+  await page.waitForFunction(async (before) => /** @type {any} */ ((await chrome.storage.local.get('snapshot')).snapshot)?.fetchedAt !== before, fetchedBefore, { timeout: 20000 }).catch(() => {})
+  await page.waitForTimeout(300)
+  await openStale()
+  check('the background refresh shows the finished build', ((await chipOf(103).textContent()) ?? '') === 'Jenkins #4 passed', (await chipOf(103).textContent()) ?? '')
+  pr103Done = false
+  await page.click('#refresh')
+  await settled()
+  pr103Done = true
+  const before103 = buildUrls.filter((u) => u.includes('/PR-103/')).length
+  await page.click('#refresh')
+  await settled()
+  await openStale()
+  check('the top Refresh asks Jenkins again', buildUrls.filter((u) => u.includes('/PR-103/')).length > before103)
+  check('and shows the finished build without a card refresh', ((await chipOf(103).textContent()) ?? '') === 'Jenkins #4 passed', (await chipOf(103).textContent()) ?? '')
 
   await page.click('#toggle-settings')
   await page.fill('#jenkins-token', 'bad')
