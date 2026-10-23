@@ -175,6 +175,24 @@ details.stale > .pr + .pr { margin-top: 8px; }
 .sig-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .sig-row:last-child { border-bottom: 0; }
 .sprint { display: grid; gap: 14px; min-width: 0; }
+.sprint-bar { display: flex; gap: 8px; align-items: center; }
+.sprint-bar select { font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); min-width: 0; max-width: 100%; }
+.sprint-trend { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px 6px; min-width: 0; }
+.sprint-trend figcaption { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; }
+.sprint-load-year { font-size: 12px; padding: 2px 10px; }
+.trend-plot { position: relative; }
+.trend-plot svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+.trend-grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; }
+.trend-base { stroke: var(--line); stroke-width: 1; }
+.trend-axis { fill: var(--muted); font-size: 10px; }
+.trend-axis.trend-on { fill: var(--fg); font-weight: 600; }
+.trend-line { fill: none; stroke: var(--link); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-hit { fill: transparent; }
+.trend-none { fill: var(--card); stroke: var(--muted); stroke-width: 1.5; }
+.trend-pt { cursor: pointer; outline: none; }
+.trend-dot { fill: var(--link); stroke: var(--card); stroke-width: 2; }
+.trend-pt.trend-on .trend-dot, .trend-pt:hover .trend-dot, .trend-pt:focus-visible .trend-dot { stroke: var(--fg); }
+.trend-tip { position: absolute; transform: translate(-50%, calc(-100% - 10px)); background: var(--fg); color: var(--bg); font-size: 12px; padding: 3px 8px; border-radius: 6px; white-space: nowrap; pointer-events: none; }
 .sprint-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
 .sprint-title { display: grid; gap: 2px; }
 .sprint-title h2 { margin: 0; font-size: 18px; }

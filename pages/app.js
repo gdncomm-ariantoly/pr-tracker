@@ -2,14 +2,14 @@ import { groupPRs, STALE_DAYS } from '../lib/group.js'
 import { renderComment } from './markdown.js'
 import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.js'
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
-import { judgeOnePR, refresh, refreshOnePR } from '../lib/refresh.js'
+import { judgeOnePR, loadSprint, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { formatHours, readings, TIER_LABEL, worstTier } from '../lib/signals.js'
-import { CATEGORIES, CONTEXT, formatValue } from '../lib/sprint.js'
+import { CATEGORIES, CONTEXT, formatValue, sprintChoices, sprintsOfYear } from '../lib/sprint.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { resumeCommand } from '../lib/sessions.js'
 import { claudeCode, helperInfo, localSessions, nativeAllowed, secrets, SUMMARY_HELPER } from '../platform.js'
-import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, KEYCHAIN_REF, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
+import { ciSearchLink, deployJenkinsLink, JENKINS_TEMPLATE, KEYCHAIN_REF, jenkinsOrigin, loadInbox, saveInbox, loadOverrides, loadSettings, loadSnapshot, loadSprintCards, parseList, parseRepos, saveOverrides, saveSettings } from '../lib/store.js'
 
 /** @typedef {import('../lib/github.js').Snapshot} Snapshot */
 /** @typedef {import('../lib/github.js').ReviewPR} ReviewPR */
@@ -52,6 +52,11 @@ const state = {
   jenkinsHasToken: false,
   claudeReady: false,
   showSignals: true,
+  /** The OrgSignals tab's scorecard: 'current', or a picker key ("2026-SP19", "2026"). */
+  sprintKey: 'current',
+  /** @type {import('../lib/store.js').SprintCards} */ sprintCards: {},
+  /** @type {Set<string>} */ sprintLoading: new Set(),
+  /** @type {Record<string, string>} */ sprintErrors: {},
   /** @type {import('../lib/inbox.js').InboxItem[]} */ inbox: [],
   /** Folded comments (fixed / no action needed) the user opened. */
   /** @type {Set<string>} */ unfolded: new Set(),
@@ -66,13 +71,14 @@ try {
   state.onlyPending = saved.onlyPending === true
   state.showWatched = saved.showWatched !== false
   state.staleOpen = saved.staleOpen === true
+  if (typeof saved.sprintKey === 'string') state.sprintKey = saved.sprintKey
 } catch {
   // per-viewer convenience only
 }
 
 function remember() {
   try {
-    localStorage.setItem('ui', JSON.stringify({ tab: state.tab, onlyPending: state.onlyPending, showWatched: state.showWatched, staleOpen: state.staleOpen }))
+    localStorage.setItem('ui', JSON.stringify({ tab: state.tab, onlyPending: state.onlyPending, showWatched: state.showWatched, staleOpen: state.staleOpen, sprintKey: state.sprintKey }))
   } catch {
     // ignore
   }
@@ -796,20 +802,80 @@ const tierChip = (tier) => el('span', `chip ${TIER_CLASS[tier]}`, TIER_LABEL[tie
 const shortDate = (date) => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 
 /**
- * The OrgSignals tab: this sprint's scorecard, computed at refresh.
- * @param {import('../lib/sprint.js').SprintCard | undefined} sc
+ * Score a sprint or year the page doesn't have yet (or again, with ↻). The
+ * result lands in storage; the storage listener repaints.
+ * @param {string} key
  */
-function renderSprint(sc) {
+async function requestSprint(key) {
+  if (state.sprintLoading.has(key)) return
+  state.sprintLoading.add(key)
+  delete state.sprintErrors[key]
+  paint()
+  const result = await loadSprint(key, { secrets })
+  state.sprintLoading.delete(key)
+  if (result.kind === 'error') state.sprintErrors[key] = result.message
+  else state.sprintCards = { ...state.sprintCards, [key]: result.card }
+  paint()
+}
+
+/**
+ * The OrgSignals tab: the picked sprint's (or year's) scorecard, with the
+ * year's trend line. The current sprint comes from the refresh.
+ * @param {import('../lib/sprint.js').SprintCard | undefined} current
+ */
+function renderSprint(current) {
   const box = el('section', 'sprint')
   box.id = 'sprint'
+  const now = Date.now()
+  const choices = sprintChoices(now)
+  if (state.sprintKey !== 'current' && !choices.some((c) => c.key === state.sprintKey)) state.sprintKey = 'current'
+  const key = state.sprintKey === 'current' ? current?.sprint.key ?? '' : state.sprintKey
+  const sc = state.sprintKey === 'current' || key === current?.sprint.key ? current : state.sprintCards[key]
+
+  const bar = el('div', 'sprint-bar')
+  const pick = /** @type {HTMLSelectElement} */ (el('select', ''))
+  pick.id = 'sprint-pick'
+  pick.setAttribute('aria-label', 'Sprint or year to show')
+  const now0 = el('option', '', `Current sprint${current ? ` (${current.sprint.name})` : ''}`)
+  now0.setAttribute('value', 'current')
+  pick.append(now0)
+  for (const c of choices) {
+    const o = el('option', '', c.label)
+    o.setAttribute('value', c.key)
+    pick.append(o)
+  }
+  pick.value = state.sprintKey
+  pick.addEventListener('change', () => {
+    state.sprintKey = pick.value
+    remember()
+    paint()
+  })
+  const loading = state.sprintLoading.has(key)
+  const again = /** @type {HTMLButtonElement} */ (el('button', 'sprint-reload', loading ? 'Loading…' : '↻'))
+  again.type = 'button'
+  again.disabled = loading
+  again.title = sc?.sprint.kind === 'year' ? 'Fetch this year again from GitHub' : 'Fetch this sprint again from GitHub'
+  again.setAttribute('aria-label', again.title)
+  again.addEventListener('click', () => (state.sprintKey === 'current' || key === current?.sprint.key ? void doRefresh() : void requestSprint(key)))
+  bar.append(pick, again)
+  box.append(bar)
+
+  const year = sc?.sprint.year ?? Number(key.slice(0, 4)) ?? new Date(now).getFullYear()
+  if (Number.isFinite(year) && year > 2000) box.append(renderTrend(year, current, key))
+
+  if (state.sprintErrors[key]) box.append(el('p', 'banner error', `Couldn't load it: ${state.sprintErrors[key]}`))
   if (!sc) {
-    box.append(el('p', 'muted empty', 'No sprint scorecard yet. Refresh to compute it (the sprint calendar must cover today).'))
+    if (key && state.sprintKey !== 'current' && !loading && !state.sprintErrors[key]) void requestSprint(key)
+    box.append(el('p', 'muted empty', loading || (key && state.sprintKey !== 'current') ? (/^\d{4}$/.test(key) ? `Fetching all of ${key} from GitHub; this takes about half a minute, once…` : 'Fetching it from GitHub…') : 'No sprint scorecard yet. Refresh to compute it (the sprint calendar must cover today).'))
     return box
   }
   const s = sc.sprint
+  const isYear = s.kind === 'year'
   const head = el('div', 'sprint-head')
   const title = el('div', 'sprint-title')
-  title.append(el('h2', '', `${s.name} ${s.year}`), el('span', 'muted', `${shortDate(s.start)} – ${shortDate(s.end)} · ${s.current ? `day ${s.day} of ${s.days}` : 'finished'}`))
+  const status = isYear ? `${s.days} working days${s.current ? `, ${s.day} so far` : ''}` : s.current ? `day ${s.day} of ${s.days}` : 'finished'
+  const span = isYear ? `${shortDate(s.start)} ${s.start.slice(0, 4)} – ${shortDate(s.end)} ${s.end.slice(0, 4)}` : `${shortDate(s.start)} – ${shortDate(s.end)}`
+  title.append(el('h2', '', isYear ? s.name : `${s.name} ${s.year}`), el('span', 'muted', `${span} · ${status}`))
   const updated = el('span', 'muted sprint-updated')
   stamp(updated, sc.computedAt, 'computed ')
   title.append(updated)
@@ -825,10 +891,11 @@ function renderSprint(sc) {
   if (s.between) box.append(el('p', 'banner info', `${s.between.name} (${shortDate(s.between.start)} – ${shortDate(s.between.end)}): showing the last sprint.`))
   if (sc.error) box.append(el('p', 'banner warning', `Couldn't update the scorecard on the last refresh (${sc.error}); this is the previous one.`))
   if (!sc.card) {
-    box.append(el('p', 'muted empty', `Nothing scored yet in ${s.name}: no PRs opened, merged or reviewed in the team's repos into release/*.`))
+    box.append(el('p', 'muted empty', `Nothing scored in ${s.name}: no PRs opened, merged or reviewed in the team's repos into release/*.`))
     return box
   }
-  if (s.current) box.append(el('p', 'muted sprint-note', `Mid-sprint: per-week metrics divide by ${s.weeks} week${s.weeks === 1 ? '' : 's'} so far, and P75s move as more PRs land.`))
+  if (isYear) box.append(el('p', 'muted sprint-note', `The whole year as one window: P75s over all its PRs, per-week metrics over ${Number(s.weeks.toFixed(1))} weeks (gap and hack weeks included). OrgSignals itself scores per sprint.`))
+  else if (s.current) box.append(el('p', 'muted sprint-note', `Mid-sprint: per-week metrics divide by ${s.weeks} week${s.weeks === 1 ? '' : 's'} so far, and P75s move as more PRs land.`))
 
   const grid = el('div', 'sprint-cats')
   for (const cat of CATEGORIES) {
@@ -848,7 +915,7 @@ function renderSprint(sc) {
   box.append(context)
 
   const prs = el('section', 'sprint-prs')
-  prs.append(el('h3', '', `Your PRs opened in ${s.name} (${sc.prs.length}) · ${sc.reviewedCount} reviewed for others`))
+  prs.append(el('h3', '', `Your PRs opened in ${isYear ? s.year : s.name} (${sc.prs.length}) · ${sc.reviewedCount} reviewed for others`))
   if (sc.prs.length) {
     const table = el('table', '')
     const thead = el('tr', '')
@@ -879,6 +946,115 @@ function renderSprint(sc) {
   }
   box.append(prs)
   box.append(el('p', 'muted sig-foot', 'Computed from GitHub the way the growth-signals sprint-score skill does (P75 of your PRs, sprint calendar in WIB), for the team\'s tracked repos merging into release/* only, so it can differ from OrgSignals. Hover a metric for what it measures.'))
+  return box
+}
+
+/**
+ * Overall score per sprint of the year, from the scorecards the page has.
+ * Tier bounds (55 / 70 / 85) are the only grid lines; a point opens its sprint.
+ *
+ * @param {number} year
+ * @param {import('../lib/sprint.js').SprintCard | undefined} current
+ * @param {string} selected
+ */
+function renderTrend(year, current, selected) {
+  const sprints = sprintsOfYear(year, Date.now())
+  const points = sprints.map((sp, i) => {
+    const sc = sp.key === current?.sprint.key ? current : state.sprintCards[sp.key]
+    return { ...sp, i, loaded: !!sc, score: sc?.card ? sc.card.overall : null, tier: sc?.card?.overallTier ?? 'NO_ACTIVITY', running: !!sc?.sprint.current }
+  })
+  const box = el('figure', 'sprint-trend')
+  const cap = el('figcaption', '')
+  cap.append(el('span', '', `Overall per sprint, ${year}`))
+  const missing = points.filter((p) => !p.loaded).length
+  if (missing) {
+    const loadYear = /** @type {HTMLButtonElement} */ (el('button', 'sprint-load-year', state.sprintLoading.has(String(year)) ? 'Loading…' : `Load all ${year} (${missing} missing)`))
+    loadYear.type = 'button'
+    loadYear.disabled = state.sprintLoading.has(String(year))
+    loadYear.title = `Fetch the whole of ${year} once from GitHub; that scores every sprint in it`
+    loadYear.addEventListener('click', () => void requestSprint(String(year)))
+    cap.append(loadYear)
+  }
+  box.append(cap)
+
+  // Drawn at the width it gets, so labels stay readable on a phone.
+  const W = Math.max(300, Math.min(820, ($('list').clientWidth || 640) - 34))
+  const HGT = 150
+  const pad = { l: 62, r: 12, t: 10, b: 22 }
+  const x = (/** @type {number} */ i) => pad.l + (sprints.length < 2 ? (W - pad.l - pad.r) / 2 : (i * (W - pad.l - pad.r)) / (sprints.length - 1))
+  const y = (/** @type {number} */ v) => pad.t + ((100 - v) * (HGT - pad.t - pad.b)) / 100
+  const NS = 'http://www.w3.org/2000/svg'
+  /** @type {Element} */
+  const svg = document.createElementNS(NS, 'svg')
+  svg.setAttribute('viewBox', `0 0 ${W} ${HGT}`)
+  svg.setAttribute('role', 'img')
+  svg.setAttribute('aria-label', `Overall score per sprint in ${year}: ${points.filter((p) => p.loaded).map((p) => `${p.name} ${p.score ?? 'no activity'}`).join(', ') || 'none loaded yet'}`)
+  /** @param {string} tag @param {Record<string, string | number>} attrs @param {Element} [parent] */
+  const add = (tag, attrs, parent = svg) => {
+    const n = document.createElementNS(NS, tag)
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v))
+    parent.append(n)
+    return n
+  }
+  for (const [v, label] of /** @type {const} */ ([[85, 'Elite'], [70, 'High'], [55, 'Medium']])) {
+    add('line', { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v), class: 'trend-grid' })
+    add('text', { x: pad.l - 6, y: y(v) + 3, class: 'trend-axis', 'text-anchor': 'end' }).textContent = `${label} ${v}`
+  }
+  add('line', { x1: pad.l, x2: W - pad.r, y1: y(0), y2: y(0), class: 'trend-base' })
+  // The line breaks where a sprint isn't loaded or had no activity, rather than guessing across it.
+  let run = /** @type {string[]} */ ([])
+  const flush = () => {
+    if (run.length > 1) add('polyline', { points: run.join(' '), class: 'trend-line' })
+    run = []
+  }
+  for (const p of points) {
+    if (p.score === null) flush()
+    else run.push(`${x(p.i)},${y(p.score)}`)
+  }
+  flush()
+  const tip = el('div', 'trend-tip')
+  tip.hidden = true
+  const every = Math.ceil(sprints.length / 12)
+  for (const p of points) {
+    if (p.i % every === 0 || p.key === selected) add('text', { x: x(p.i), y: HGT - 6, class: `trend-axis${p.key === selected ? ' trend-on' : ''}`, 'text-anchor': 'middle' }).textContent = p.name.replace('SP', '')
+    if (!p.loaded) continue
+    if (p.score === null) {
+      // Nothing scored that sprint: a hollow mark on the baseline, not a score of 0.
+      const none = add('circle', { cx: x(p.i), cy: y(0), r: 3.5, class: 'trend-none' })
+      add('title', {}, none).textContent = `${p.name}: no activity`
+      continue
+    }
+    const g = add('g', { class: `trend-pt${p.key === selected ? ' trend-on' : ''}`, 'data-key': p.key, tabindex: 0, role: 'button', 'aria-label': `${p.name}: ${p.score}, ${TIER_LABEL[p.tier]}` })
+    add('circle', { cx: x(p.i), cy: y(p.score), r: 12, class: 'trend-hit' }, g)
+    add('circle', { cx: x(p.i), cy: y(p.score), r: p.key === selected ? 5.5 : 4, class: `trend-dot ${TIER_CLASS[p.tier]}` }, g)
+    const show = () => {
+      tip.textContent = `${p.name}: ${p.score} · ${TIER_LABEL[p.tier]}${p.running ? ' (so far)' : ''}`
+      tip.hidden = false
+      tip.style.left = `${(x(p.i) / W) * 100}%`
+      // Near an edge, hang the tip inward so it never leaves the card.
+      const at = x(p.i) / W
+      tip.style.transform = `translate(${at > 0.75 ? '-100%' : at < 0.25 ? '0' : '-50%'}, calc(-100% - 10px))`
+      tip.style.top = `${(y(p.score ?? 0) / HGT) * 100}%`
+    }
+    const open = () => {
+      state.sprintKey = p.key === current?.sprint.key ? 'current' : p.key
+      remember()
+      paint()
+    }
+    g.addEventListener('pointerenter', show)
+    g.addEventListener('focus', show)
+    g.addEventListener('pointerleave', () => (tip.hidden = true))
+    g.addEventListener('blur', () => (tip.hidden = true))
+    g.addEventListener('click', open)
+    g.addEventListener('keydown', (event) => {
+      if (/** @type {KeyboardEvent} */ (event).key === 'Enter' || /** @type {KeyboardEvent} */ (event).key === ' ') open()
+    })
+  }
+  const plot = el('div', 'trend-plot')
+  svg.setAttribute('width', String(W))
+  svg.setAttribute('height', String(HGT))
+  plot.append(svg, tip)
+  box.append(plot)
   return box
 }
 
@@ -1239,6 +1415,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
     state.snapshot = /** @type {Snapshot} */ (changes.snapshot.newValue)
     paint()
   }
+  if (changes.sprintCards) {
+    const next = changes.sprintCards.newValue
+    state.sprintCards = next && typeof next === 'object' ? /** @type {any} */ (next) : {}
+    if (state.tab === 'signals') paint()
+  }
   if (changes.inbox) {
     state.inbox = normaliseInbox(changes.inbox.newValue)
     paintInbox()
@@ -1255,14 +1436,16 @@ chrome.storage.onChanged.addListener((changes, area) => {
 })
 
 async function init() {
-  const [settings, snapshot, overrides, inbox, { lastError }] = await Promise.all([
+  const [settings, snapshot, overrides, inbox, { lastError }, sprintCards] = await Promise.all([
     loadSettings(),
     loadSnapshot(),
     loadOverrides(),
     loadInbox(),
     chrome.storage.local.get('lastError'),
+    loadSprintCards(),
   ])
   state.snapshot = snapshot
+  state.sprintCards = sprintCards
   state.overrides = overrides
   state.inbox = inbox
   paintInbox()

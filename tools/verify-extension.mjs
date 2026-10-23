@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from '@playwright/test'
 
-import { sprintAt } from '../lib/sprint.js'
+import { sprintAt, sprintsOfYear, windowFor } from '../lib/sprint.js'
 import { loadFixture } from './fixture.mjs'
 
 const ROOT = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
@@ -129,7 +129,7 @@ async function verify(context, id) {
     const body = JSON.parse(route.request().postData() ?? '{}')
     if (String(body.query).includes('query Sprint')) {
       const q = String(body.variables?.q ?? '')
-      const key = q.includes('created:') ? 'created' : q.includes('merged:') ? 'merged' : q.includes('reviewed-by:') ? 'reviewed' : 'open'
+      const key = q.includes('reviewed-by:') ? 'reviewed' : q.includes('created:') ? 'created' : q.includes('merged:') ? 'merged' : 'open'
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { viewer: fixture.data.viewer, search: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: sprintPRs[key] ?? [] } } }) })
     }
     if (mode === 'jenkins-hidden') {
@@ -582,9 +582,14 @@ async function verify(context, id) {
     reviews: { nodes: [{ author: { login: 'ana', __typename: 'User' }, submittedAt: t(0.5), state: 'APPROVED' }] }, reviewThreads: { nodes: [] }, comments: { nodes: [] }, ...over,
   })
   const merged = sprintPR(501, { state: 'MERGED', mergedAt: t(0.6) })
+  // And one in the sprint before (the mocked search answers the same for every window; the page filters).
+  const thisSprint = /** @type {import('../lib/sprint.js').SprintWindow} */ (sprintAt(Date.now()))
+  const prevKey = sprintsOfYear(thisSprint.year, Date.now()).map((x) => x.key).filter((k) => k !== thisSprint.key).pop()
+  const prev = prevKey ? windowFor(prevKey, Date.now()) : null
+  const earlier = prev && sprintPR(505, { state: 'MERGED', createdAt: new Date(prev.from + 2 * 86_400_000).toISOString(), mergedAt: new Date(prev.from + 3 * 86_400_000).toISOString(), commits: { nodes: [{ commit: { authoredDate: new Date(prev.from + 86_400_000).toISOString(), committedDate: new Date(prev.from + 86_400_000).toISOString() } }] } })
   sprintPRs = {
-    created: [merged, sprintPR(502, {}), sprintPR(503, { baseRefName: 'master' })],
-    merged: [merged],
+    created: [merged, sprintPR(502, {}), sprintPR(503, { baseRefName: 'master' }), ...(earlier ? [earlier] : [])],
+    merged: [merged, ...(earlier ? [earlier] : [])],
     reviewed: [sprintPR(504, { author: { login: 'ana', __typename: 'User' }, reviews: { nodes: [{ author: { login: me, __typename: 'User' }, submittedAt: t(0.7), state: 'APPROVED' }] } })],
     open: [],
   }
@@ -627,8 +632,30 @@ async function verify(context, id) {
   check('all 13 scored metrics, plus 3 inside cycle time', (await sprint.locator('.sprint-cat .sig-row').count()) === 13 && (await sprint.locator('.sprint-context .sig-row').count()) === 3)
   check('only PRs into release/* count', (await sprint.locator('.sprint-prs tr').count()) === 3 && (await sprint.locator('.sprint-prs a', { hasText: '#503' }).count()) === 0)
   check('PR size is the P75 of my PRs this sprint', ((await sprint.locator('.sig-row[data-metric="pr_size"] .sig-val strong').textContent()) ?? '') === '240 lines' && ((await sprint.locator('.sig-row[data-metric="pr_size"] .chip').textContent()) ?? '') === 'Elite')
-  check('PRs reviewed counts the one I reviewed', ((await sprint.locator('.sig-row[data-metric="prs_reviewed"] .sig-scale').textContent()) ?? '').startsWith('1 counted'))
+  check('PRs reviewed counts the one I reviewed', ((await sprint.locator('.sig-row[data-metric="prs_reviewed"] .sig-scale').textContent()) ?? '').startsWith('1 counted'), (await sprint.locator('.sig-row[data-metric="prs_reviewed"] .sig-scale').textContent()) ?? '')
   check('the PR filter is hidden on this tab', await page.isHidden('#pending-filter'))
+  check('a trend line for the year, with the current sprint on it', (await sprint.locator('.sprint-trend .trend-pt').count()) >= 1 && (await sprint.locator(`.trend-pt[data-key="${thisSprint.key}"]`).count()) === 1)
+  if (prev && prevKey) {
+    await page.selectOption('#sprint-pick', prevKey)
+    await page.waitForFunction((name) => document.querySelector('#sprint h2')?.textContent?.startsWith(name) && !!document.querySelector('#sprint .sprint-overall'), prev.name, { timeout: 10000 }).catch(() => {})
+    check('picking an earlier sprint fetches and scores it', ((await page.textContent('#sprint h2')) ?? '').startsWith(prev.name) && (await sprint.locator('.sprint-prs a', { hasText: '#505' }).count()) === 1 && (await sprint.locator('.sprint-prs a', { hasText: '#501' }).count()) === 0)
+    check('it says the sprint is finished', ((await sprint.locator('.sprint-title > span').first().textContent()) ?? '').endsWith('finished'))
+    check('and it joins the trend line', (await sprint.locator(`.trend-pt[data-key="${prevKey}"].trend-on`).count()) === 1)
+    await sprint.locator(`.trend-pt[data-key="${thisSprint.key}"]`).click()
+    check('a point on the trend line opens its sprint', (await page.inputValue('#sprint-pick')) === 'current' && ((await page.textContent('#sprint h2')) ?? '').startsWith(thisSprint.name))
+  }
+  const all = sprintsOfYear(thisSprint.year, Date.now()).length
+  if (all > 2) {
+    await sprint.locator('.sprint-load-year').click()
+    await page.waitForFunction((n) => document.querySelectorAll('#sprint .trend-pt, #sprint .trend-none').length === n, all, { timeout: 15000 }).catch(() => {})
+    const marks = await sprint.locator('.trend-pt, .trend-none').count()
+    check('"Load all" scores every sprint of the year in one go', marks === all && (await sprint.locator('.sprint-load-year').count()) === 0, `${marks} of ${all}`)
+    check('a sprint with no activity is a hollow mark, not a score of 0', (await sprint.locator('.trend-none').count()) === all - (earlier ? 2 : 1))
+  }
+  await page.selectOption('#sprint-pick', String(thisSprint.year))
+  await page.waitForFunction((y) => document.querySelector('#sprint h2')?.textContent === `Whole ${y}`, thisSprint.year, { timeout: 15000 }).catch(() => {})
+  check('the whole year is a choice too', ((await page.textContent('#sprint h2')) ?? '') === `Whole ${thisSprint.year}` && (await sprint.locator('.sprint-cat').count()) === 4 && (await sprint.locator('.sprint-prs tr').count()) === (earlier ? 4 : 3))
+  await page.selectOption('#sprint-pick', 'current')
   await page.setViewportSize({ width: 390, height: 800 })
   check('the scorecard fits a phone-width window', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), String(await page.evaluate(() => document.documentElement.scrollWidth)))
   await page.setViewportSize({ width: 1280, height: 720 })

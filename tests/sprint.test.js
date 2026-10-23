@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { fetchSprint } from '../lib/github.js'
-import { refresh } from '../lib/refresh.js'
-import { buildSprint, classify, formatValue, p75, RULES, scoreAll, sprintAt, sprintSearches } from '../lib/sprint.js'
+import { loadSprint, refresh } from '../lib/refresh.js'
+import { buildSprint, buildYear, classify, splitSearches, formatValue, p75, RULES, scoreAll, sprintAt, sprintChoices, sprintSearches, sprintsOfYear, windowFor } from '../lib/sprint.js'
 
 const H = 3_600_000
 /** Hours after SP19 began (2026-10-05 00:00 WIB). */
@@ -51,6 +51,44 @@ describe('sprint calendar', () => {
     const w = sprintAt(Date.parse('2026-07-22T10:00:00+07:00'))
     assert.equal(w?.name, 'SP13')
     assert.equal(w?.between?.name, 'Gap week')
+  })
+  it('any sprint by key: a finished one over its full 2 weeks', () => {
+    const w = windowFor('2026-SP19', Date.parse('2026-10-23T12:00:00+07:00'))
+    assert.equal(w?.current, false)
+    assert.equal(w?.weeks, 2)
+    assert.equal(new Date(/** @type {number} */ (w?.until)).toISOString(), '2026-10-18T17:00:00.000Z')
+    assert.equal(windowFor('2026-SP21', Date.parse('2026-10-23T12:00:00+07:00')), null, 'not begun')
+    assert.equal(windowFor('2026-SP99', Date.now()), null)
+  })
+  it('a whole year: every period starting in it, to the next year\'s first', () => {
+    const now = Date.parse('2026-10-23T12:00:00+07:00')
+    const y = /** @type {import('../lib/sprint.js').SprintWindow} */ (windowFor('2026', now))
+    assert.equal(y.kind, 'year')
+    assert.equal(y.name, 'Whole 2026')
+    assert.equal(y.start, '2026-01-05')
+    assert.equal(y.end, '2027-01-01')
+    assert.equal(y.current, true)
+    assert.equal(y.day, 210)
+    assert.equal(y.weeks, 42)
+    assert.equal(windowFor('2026', Date.parse('2027-02-01T00:00:00Z'))?.current, false)
+  })
+  it('the picker: newest first, each year with its whole-year entry', () => {
+    const c = sprintChoices(Date.parse('2026-10-23T12:00:00+07:00'))
+    assert.deepEqual(c.slice(0, 3).map((x) => x.key), ['2026', '2026-SP20', '2026-SP19'])
+    assert.equal(c.length, 21)
+    assert.equal(c[1].label, 'SP20 2026 · 10-19 – 10-30')
+    assert.deepEqual(sprintsOfYear(2026, Date.parse('2026-02-03T00:00:00+07:00')).map((x) => x.key), ['2026-SP01', '2026-SP02', '2026-SP03'])
+  })
+  it('a past sprint\'s searches skip open PRs and bound reviews by when the PR was opened', () => {
+    const q = sprintSearches(/** @type {any} */ (windowFor('2026-SP19', Date.parse('2026-10-23T12:00:00+07:00'))))
+    assert.equal(q.open, undefined)
+    assert.match(q.reviewed, /created:<=2026-10-18T23:59:59\+07:00$/)
+  })
+  it('a year is searched a month at a time, side by side', () => {
+    const q = splitSearches(/** @type {any} */ (windowFor('2026', Date.parse('2026-10-23T12:00:00+07:00'))))
+    assert.equal(q.length, 22, '10 months × opened / merged, reviews, open PRs')
+    assert.deepEqual(q[0], ['created', 'is:pr org:gdncomm author:@me created:2026-01-05T00:00:00+07:00..2026-01-31T23:59:59+07:00'])
+    assert.equal(q[19][1], 'is:pr org:gdncomm author:@me merged:2026-10-01T00:00:00+07:00..2026-10-23T11:59:59+07:00')
   })
   it('outside the calendar: nothing', () => assert.equal(sprintAt(Date.parse('2027-03-01T00:00:00Z')), null))
   it('searches keep the WIB midnight and gdncomm', () => {
@@ -131,6 +169,22 @@ describe('buildSprint', () => {
     assert.equal(buildSprint({ login: 'me', window: SP19, created: [], merged: [], reviewed: [], open: [] }).card, null))
 })
 
+describe('buildYear', () => {
+  it('one set of searches scores the year and each finished sprint in it', () => {
+    const now = Date.parse('2026-10-23T12:00:00+07:00')
+    const y = /** @type {import('../lib/sprint.js').SprintWindow} */ (windowFor('2026', now))
+    const inSP19 = pr(1, 10, { state: 'MERGED', mergedAt: at(30) })
+    const inSP18 = pr(2, -14 * 24, { state: 'MERGED', mergedAt: at(-14 * 24 + 20) })
+    const { year, sprints } = buildYear({ login: 'me', window: y, created: [inSP19, inSP18], merged: [inSP19, inSP18], reviewed: [], now })
+    assert.equal(year.prs.length, 2)
+    assert.equal(sprints['2026-SP19'].prs.length, 1)
+    assert.equal(sprints['2026-SP18'].prs.length, 1)
+    assert.equal(sprints['2026-SP17'].card, null)
+    assert.equal(sprints['2026-SP20'], undefined, 'the running sprint is the refresh\'s')
+    assert.equal(Object.keys(sprints).length, 19)
+  })
+})
+
 describe('fetchSprint', () => {
   it('reads every page of each search', async () => {
     /** @type {any[]} */
@@ -145,6 +199,8 @@ describe('fetchSprint', () => {
     assert.equal(got.viewer, 'me')
     assert.deepEqual(got.results.created.map((p) => p.number), [1, 2])
     assert.deepEqual(seen, [{ q: 'q1', after: null }, { q: 'q1', after: 'c1' }])
+    const twice = await fetchSprint({ token: 't', searches: [['created', 'q1'], ['created', 'q2']], fetchImpl, retryDelays: [] })
+    assert.deepEqual(twice.results.created.map((p) => p.number), [1, 2], 'the same PR from two searches counts once')
   })
 })
 
@@ -170,6 +226,22 @@ describe('refresh keeps the sprint card', () => {
     const second = await refresh({ area, fetchImpl: github(true), retryDelays: [] })
     assert.equal(second.sprint?.computedAt, first.sprint?.computedAt)
     assert.match(String(second.sprint?.error), /502/)
+  })
+  it('the picker scores a sprint once and keeps it', async () => {
+    const area = memory()
+    await area.set({ settings: { token: 't' } })
+    const got = await loadSprint('2026-SP19', { area, fetchImpl: github(false), retryDelays: [] })
+    assert.equal(got.kind, 'ok')
+    assert.equal(/** @type {any} */ (area.data.sprintCards)['2026-SP19'].sprint.name, 'SP19')
+    assert.equal((await loadSprint('2026-SP19', { area, fetchImpl: github(true), retryDelays: [] })).kind, 'error')
+    assert.ok(/** @type {any} */ (area.data.sprintCards)['2026-SP19'], 'a failed reload keeps the card')
+    assert.match(String(/** @type {any} */ (await loadSprint('1999', { area, fetchImpl: github(false) })).message), /isn't in the sprint calendar/)
+  })
+  it('the refresh keeps the current sprint for the trend line too', async () => {
+    const area = memory()
+    await area.set({ settings: { token: 't' } })
+    const snap = await refresh({ area, fetchImpl: github(false), retryDelays: [] })
+    assert.ok(/** @type {any} */ (area.data.sprintCards)[/** @type {string} */ (snap.sprint?.sprint.key)])
   })
   it('not asked when OrgSignals is off', async () => {
     const area = memory()
