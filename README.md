@@ -1,6 +1,6 @@
 # PR Tracker
 
-Click the toolbar icon to open a dashboard of **your open PRs** and **PRs waiting for your review** (review requested, open PRs you already reviewed, and open PRs in any *watched repositories* you list in Settings) on github.com. Each PR says whether any human (non-bot) has commented, lists those comments, and marks each one fixed or not:
+Click the toolbar icon for a compact pop-up of **your open PRs** and **PRs waiting for your review** (each row opens the PR on GitHub; ↻ refreshes; **Open full page** opens the dashboard). The dashboard has **your open PRs** and **PRs waiting for your review** (review requested, open PRs you already reviewed, and open PRs in any *watched repositories* you list in Settings) on github.com. Each PR says whether any human (non-bot) has commented, lists those comments, and marks each one fixed or not:
 
 | Status | Counts as | Evidence |
 |---|---|---|
@@ -145,7 +145,7 @@ After changing `manifest.json` or `background.js`, click the card's reload arrow
    - Repository permissions: **Pull requests**, **Contents** and **Commit statuses**, all Read-only (Metadata is automatic). Commit statuses is what shows the Jenkins build.
    - *Generate token* and copy it: GitHub shows it only once.
 2. If the org requires approval, wait until the token is no longer **pending**. No "Configure SSO" step is needed for fine-grained tokens.
-3. Click the toolbar icon: Settings opens as a pop-up the first time (later: **Settings**, top right; Esc or × closes it). Paste the token → **Save**.
+3. Click the toolbar icon: the first time (no token yet) it opens the full page with Settings as a pop-up (later: **Settings**, top right; Esc or × closes it). Paste the token → **Save**.
 
    <img src="docs/steps/paste-token.png" width="460" alt="The Settings pop-up with the GitHub token field and Save circled">
 

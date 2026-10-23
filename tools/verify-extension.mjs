@@ -388,6 +388,38 @@ async function verify(context, id) {
   const requested = data.requested.nodes.length
   check('badge shows review-requested count', badge === (requested ? String(requested) : ''), JSON.stringify(badge))
 
+  // The toolbar pop-up: a compact list from the stored snapshot (opened here as a tab, 400 px wide like the real one).
+  const manifest = await page.evaluate(() => chrome.runtime.getManifest())
+  check('the toolbar button opens the mini pop-up', manifest.action?.default_popup === 'pages/popup.html')
+  const { page: popup, errors: popupErrors } = await openPage(context, `chrome-extension://${id}/pages/popup.html`)
+  await popup.setViewportSize({ width: 400, height: 580 })
+  await popup.waitForSelector('#list .row, #empty:not([hidden])')
+  const expectRows = await popup.evaluate(async () => {
+    const { groupPRs } = await import('../lib/group.js')
+    const snapshot = /** @type {any} */ ((await chrome.storage.local.get('snapshot')).snapshot)
+    return Object.fromEntries(['toReview', 'mine'].map((tab) => [tab, groupPRs(snapshot[tab], Date.now(), snapshot.viewer).services.flatMap((g) => g.prs).map((/** @type {any} */ p) => p.id)]))
+  })
+  await popup.click('#tab-toReview')
+  const popupIds = async () => popup.locator('#list .row').evaluateAll((rows) => rows.map((r) => /** @type {HTMLElement} */ (r).dataset.id))
+  check('the pop-up lists To review in the full page\'s order, stale ones left out', JSON.stringify(await popupIds()) === JSON.stringify(expectRows.toReview) && (await popup.textContent('#n-toReview')) === String(reviewIds.size))
+  check('each row opens the PR on GitHub in a new tab', (await popup.locator('#list a.row[href^="https://github.com/"][target="_blank"]').count()) === expectRows.toReview.length)
+  await popup.click('#tab-mine')
+  check('My PRs too', JSON.stringify(await popupIds()) === JSON.stringify(expectRows.mine))
+  check('it fits the pop-up width', await popup.evaluate(() => document.documentElement.scrollWidth <= 400))
+  const callsBefore = authHeaders.length
+  await popup.click('#refresh')
+  await popup.waitForFunction(() => document.getElementById('fetched')?.textContent === 'updated just now' && !(/** @type {HTMLButtonElement} */ (document.getElementById('refresh'))).disabled, null, { timeout: 15000 }).catch(() => {})
+  check('↻ refreshes through the worker', authHeaders.length > callsBefore && ((await popup.textContent('#fetched')) ?? '') === 'updated just now')
+  const appTabs = () => worker0.evaluate((url) => chrome.runtime.getContexts({ contextTypes: [chrome.runtime.ContextType.TAB], documentUrls: [url] }).then((t) => t.length), `chrome-extension://${id}/pages/app.html`)
+  const worker0 = context.serviceWorkers()[0]
+  const tabsBefore = await appTabs()
+  const closed = popup.waitForEvent('close', { timeout: 5000 }).then(() => true, () => false)
+  await popup.click('#open-full')
+  const wasClosed = await closed
+  const tabsAfter = await appTabs()
+  check('"Open full page" brings up the dashboard tab already open, and closes the pop-up', wasClosed && tabsAfter === tabsBefore && tabsBefore === 1, JSON.stringify({ wasClosed, tabsBefore, tabsAfter }))
+  check('the pop-up has no console errors', popupErrors.length === 0, popupErrors[0])
+
   // Updates → notifications. Serve a second response with one new human
   // comment on my first PR, and check the worker raised a notification for it.
   const worker = context.serviceWorkers()[0]

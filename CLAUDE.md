@@ -13,7 +13,7 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | Path | Role |
 |---|---|
 | `manifest.json` | MV3 manifest. Permissions: `storage`, `alarms`, `notifications`; host `api.github.com`; optional `nativeMessaging` and `*.gdn-app.com` (Jenkins) |
-| `background.js` | Service worker: opens the dashboard, refresh alarm, badge, desktop notifications, Updates inbox writes. Not persistent: listeners registered synchronously at top level, all state in storage |
+| `background.js` | Service worker: opens the dashboard (reusing its tab via `runtime.getContexts`; `tabs.query({url})` needs the `tabs` permission we don't ask for), answers the pop-up's `open-app` / `refresh` messages, refresh alarm, badge, desktop notifications, Updates inbox writes. Not persistent: listeners registered synchronously at top level, all state in storage |
 | `platform.js` | The few `chrome.*` calls (permissions, native messaging) handed to `lib/refresh.js`, kept out of `lib/` |
 | `lib/` | Pure logic, no `chrome.*`; `fetch`, storage and helper round trips are injected so everything runs under `node --test` |
 | `lib/github.js` | GraphQL client: dashboard query (one request per list, retried on 504), single-PR fetch |
@@ -30,6 +30,8 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `lib/sessions.js` | PR ↔ Claude Code session links (comment marker + helper scan) |
 | `lib/store.js` | Settings, snapshot, caches in `chrome.storage.local` (storage area is an argument for tests) |
 | `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings (`#settings-dialog`, with its own error line `#settings-error` since the page banner sits behind it) and OrgSignals (`#signals-dialog`, opened from a card's `.sig-open` button) are modal `<dialog>`s sharing the `.modal` styles; tabs To review / My PRs / OrgSignals (`#tab-signals`, hidden when Settings → OrgSignals is off) |
+| `pages/popup.html`, `popup.js`, `popup.css` | Toolbar pop-up (`action.default_popup`): compact To review / My PRs from the stored snapshot, rows link to GitHub, ↻ and Open full page go through the worker; no token yet: opens the full page |
+| `pages/tokens.css` | Colour tokens (light/dark) shared by `app.css` and `popup.css` |
 | `pages/markdown.js` | Renders GitHub `bodyHTML` through an allowlist, parsed inert; never trust remote HTML |
 | `native/` | Local native-messaging helper: `host.mjs` (sessions scan; runs `claude -p` with no tools, only after `claude auth status` shows a Team/Enterprise plan or Bedrock/Vertex; Keychain `secret-get/set/delete` via `/usr/bin/security`), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` (writes the gitignored `host-run.sh` launcher and the Chrome host manifest) |
 | `tests/` | `node --test` unit tests, `tests/fixtures/` sample GraphQL data |

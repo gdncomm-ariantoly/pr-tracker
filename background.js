@@ -1,5 +1,6 @@
 /**
- * Service worker: opens the dashboard tab, refreshes on an alarm, keeps the
+ * Service worker: opens the dashboard tab (for the toolbar pop-up and
+ * notifications), refreshes on an alarm, keeps the
  * badge showing how many PRs are waiting for my review. Not persistent — every
  * listener is registered synchronously at top level, all state is in storage.
  */
@@ -16,8 +17,22 @@ const MAX_SEPARATE = 4 // beyond this, one summary notification instead of a flo
 /** Serialises inbox writes within this worker's lifetime (not state: nothing is lost if it restarts). */
 let inboxWrites = Promise.resolve()
 
-chrome.action.onClicked.addListener(() => {
-  void openApp()
+// The toolbar button opens pages/popup.html (manifest default_popup); it asks
+// for these, since a pop-up closes as soon as it loses focus.
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return false
+  if (message?.type === 'open-app') {
+    void openApp().then(() => sendResponse({ ok: true }))
+    return true
+  }
+  if (message?.type === 'refresh') {
+    refresh({ jenkinsAllowed: hostAllowed, localSessions, claudeCode, secrets }).then(
+      () => sendResponse({ ok: true }),
+      (error) => sendResponse({ error: error instanceof Error ? error.message : String(error) }),
+    )
+    return true
+  }
+  return false
 })
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -93,12 +108,14 @@ async function paintBadge() {
   await chrome.action.setBadgeText({ text: badgeFor(await loadSnapshot()) })
 }
 
+/** Bring up the dashboard tab, or open one. */
 async function openApp() {
   const url = chrome.runtime.getURL('pages/app.html')
-  const [existing] = await chrome.tabs.query({ url })
-  if (existing?.id !== undefined) {
-    await chrome.tabs.update(existing.id, { active: true })
-    if (existing.windowId !== undefined) await chrome.windows.update(existing.windowId, { focused: true })
+  // tabs.query({url}) sees nothing without the "tabs" permission; our own pages are listed here without it.
+  const [existing] = await chrome.runtime.getContexts({ contextTypes: [chrome.runtime.ContextType.TAB], documentUrls: [url] })
+  if (existing && existing.tabId >= 0) {
+    await chrome.tabs.update(existing.tabId, { active: true })
+    if (existing.windowId >= 0) await chrome.windows.update(existing.windowId, { focused: true })
     return
   }
   await chrome.tabs.create({ url })
