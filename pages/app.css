@@ -207,7 +207,13 @@ details.stale > .pr + .pr { margin-top: 8px; }
 .sprint-table { overflow-x: auto; margin-top: 8px; }
 .sprint-table table { border-collapse: collapse; width: 100%; font-size: 12px; }
 .sprint-table th, .sprint-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-.sprint-table th { color: var(--muted); font-weight: 600; }
+.sprint-table th { color: var(--muted); font-weight: 600; padding: 0; }
+.sprint-table th .sort { font: inherit; color: inherit; background: none; border: 0; border-radius: 4px; padding: 6px 8px; cursor: pointer; white-space: nowrap; }
+.sprint-table th .sort:hover { color: var(--fg); }
+.sprint-table th .sort::after { content: "↕"; margin-left: 4px; opacity: .35; }
+.sprint-table th[aria-sort=ascending] .sort, .sprint-table th[aria-sort=descending] .sort { color: var(--fg); }
+.sprint-table th[aria-sort=ascending] .sort::after { content: "↑"; opacity: 1; }
+.sprint-table th[aria-sort=descending] .sort::after { content: "↓"; opacity: 1; }
 .sprint-table td.sprint-pr { white-space: normal; min-width: 14em; }
 .sig-name { font-weight: 600; }
 .sig-means, .sig-scale { font-size: 12px; color: var(--muted); }

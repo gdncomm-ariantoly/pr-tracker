@@ -586,7 +586,7 @@ async function verify(context, id) {
   const thisSprint = /** @type {import('../lib/sprint.js').SprintWindow} */ (sprintAt(Date.now()))
   const prevKey = sprintsOfYear(thisSprint.year, Date.now()).map((x) => x.key).filter((k) => k !== thisSprint.key).pop()
   const prev = prevKey ? windowFor(prevKey, Date.now()) : null
-  const earlier = prev && sprintPR(505, { state: 'MERGED', createdAt: new Date(prev.from + 2 * 86_400_000).toISOString(), mergedAt: new Date(prev.from + 3 * 86_400_000).toISOString(), commits: { nodes: [{ commit: { authoredDate: new Date(prev.from + 86_400_000).toISOString(), committedDate: new Date(prev.from + 86_400_000).toISOString() } }] } })
+  const earlier = prev && sprintPR(505, { additions: 50, state: 'MERGED', createdAt: new Date(prev.from + 2 * 86_400_000).toISOString(), mergedAt: new Date(prev.from + 3 * 86_400_000).toISOString(), commits: { nodes: [{ commit: { authoredDate: new Date(prev.from + 86_400_000).toISOString(), committedDate: new Date(prev.from + 86_400_000).toISOString() } }] } })
   sprintPRs = {
     created: [merged, sprintPR(502, {}), sprintPR(503, { baseRefName: 'master' }), ...(earlier ? [earlier] : [])],
     merged: [merged, ...(earlier ? [earlier] : [])],
@@ -655,6 +655,16 @@ async function verify(context, id) {
   await page.selectOption('#sprint-pick', String(thisSprint.year))
   await page.waitForFunction((y) => document.querySelector('#sprint h2')?.textContent === `Whole ${y}`, thisSprint.year, { timeout: 15000 }).catch(() => {})
   check('the whole year is a choice too', ((await page.textContent('#sprint h2')) ?? '') === `Whole ${thisSprint.year}` && (await sprint.locator('.sprint-cat').count()) === 4 && (await sprint.locator('.sprint-prs tr').count()) === (earlier ? 4 : 3))
+  if (earlier) {
+    const firstPR = async () => ((await sprint.locator('.sprint-prs tr:nth-child(2) a').textContent()) ?? '')
+    await sprint.locator('.sprint-prs th button[data-sort="size"]').click()
+    const desc = (await firstPR()).endsWith('#501') || (await firstPR()).endsWith('#502')
+    const descMark = await sprint.locator('.sprint-prs th:has(button[data-sort="size"])').getAttribute('aria-sort')
+    await sprint.locator('.sprint-prs th button[data-sort="size"]').click()
+    check('the PR table sorts by a column, largest first, then the other way', desc && descMark === 'descending' && (await firstPR()).endsWith('#505') && (await sprint.locator('.sprint-prs th:has(button[data-sort="size"])').getAttribute('aria-sort')) === 'ascending', await firstPR())
+    await page.reload()
+    check('the sort survives a reload', (await sprint.locator('.sprint-prs th:has(button[data-sort="size"])').getAttribute('aria-sort')) === 'ascending' && (await firstPR()).endsWith('#505'))
+  }
   await page.selectOption('#sprint-pick', 'current')
   await page.setViewportSize({ width: 390, height: 800 })
   check('the scorecard fits a phone-width window', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), String(await page.evaluate(() => document.documentElement.scrollWidth)))

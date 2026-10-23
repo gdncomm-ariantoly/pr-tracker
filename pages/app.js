@@ -5,7 +5,7 @@ import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { judgeOnePR, loadSprint, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
 import { formatHours, readings, TIER_LABEL, worstTier } from '../lib/signals.js'
-import { CATEGORIES, CONTEXT, formatValue, sprintChoices, sprintsOfYear } from '../lib/sprint.js'
+import { CATEGORIES, CONTEXT, formatValue, sprintChoices, sprintsOfYear, wibDate } from '../lib/sprint.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { resumeCommand } from '../lib/sessions.js'
 import { claudeCode, helperInfo, localSessions, nativeAllowed, secrets, SUMMARY_HELPER } from '../platform.js'
@@ -57,6 +57,8 @@ const state = {
   /** @type {import('../lib/store.js').SprintCards} */ sprintCards: {},
   /** @type {Set<string>} */ sprintLoading: new Set(),
   /** @type {Record<string, string>} */ sprintErrors: {},
+  /** How "Your PRs opened in …" is sorted. */
+  /** @type {{col: string, dir: 'asc' | 'desc'}} */ sprintSort: { col: 'opened', dir: 'desc' },
   /** @type {import('../lib/inbox.js').InboxItem[]} */ inbox: [],
   /** Folded comments (fixed / no action needed) the user opened. */
   /** @type {Set<string>} */ unfolded: new Set(),
@@ -72,13 +74,14 @@ try {
   state.showWatched = saved.showWatched !== false
   state.staleOpen = saved.staleOpen === true
   if (typeof saved.sprintKey === 'string') state.sprintKey = saved.sprintKey
+  if (saved.sprintSort && typeof saved.sprintSort.col === 'string' && (saved.sprintSort.dir === 'asc' || saved.sprintSort.dir === 'desc')) state.sprintSort = saved.sprintSort
 } catch {
   // per-viewer convenience only
 }
 
 function remember() {
   try {
-    localStorage.setItem('ui', JSON.stringify({ tab: state.tab, onlyPending: state.onlyPending, showWatched: state.showWatched, staleOpen: state.staleOpen, sprintKey: state.sprintKey }))
+    localStorage.setItem('ui', JSON.stringify({ tab: state.tab, onlyPending: state.onlyPending, showWatched: state.showWatched, staleOpen: state.staleOpen, sprintKey: state.sprintKey, sprintSort: state.sprintSort }))
   } catch {
     // ignore
   }
@@ -919,9 +922,25 @@ function renderSprint(current) {
   if (sc.prs.length) {
     const table = el('table', '')
     const thead = el('tr', '')
-    for (const t of ['PR', 'Size', 'Coding', 'After open', '1st review', 'Comments', 'Cycle']) thead.append(el('th', '', t))
+    const { col, dir } = SPRINT_COLUMNS.some((c) => c.key === state.sprintSort.col) ? state.sprintSort : { col: 'opened', dir: /** @type {'desc'} */ ('desc') }
+    for (const c of SPRINT_COLUMNS) {
+      const th = el('th', '')
+      th.setAttribute('aria-sort', c.key === col ? (dir === 'asc' ? 'ascending' : 'descending') : 'none')
+      const btn = /** @type {HTMLButtonElement} */ (el('button', 'sort', c.label))
+      btn.type = 'button'
+      btn.dataset.sort = c.key
+      btn.title = `Sort by ${c.label.toLowerCase()}`
+      btn.addEventListener('click', () => {
+        // Numbers start largest first (the PRs to look at); the PR name A → Z.
+        state.sprintSort = { col: c.key, dir: c.key === col ? (dir === 'asc' ? 'desc' : 'asc') : c.key === 'pr' ? 'asc' : 'desc' }
+        remember()
+        paint()
+      })
+      th.append(btn)
+      thead.append(th)
+    }
     table.append(thead)
-    for (const p of sc.prs) {
+    for (const p of sortedPRs(sc.prs, col, dir)) {
       const row = el('tr', '')
       const cell = el('td', 'sprint-pr')
       const a = /** @type {HTMLAnchorElement} */ (el('a', '', p.ref.replace(/^gdncomm\//, '')))
@@ -931,6 +950,7 @@ function renderSprint(current) {
       cell.append(a, el('span', 'muted', ` ${p.title}`))
       row.append(
         cell,
+        el('td', '', p.createdAt ? shortDate(wibDate(Date.parse(p.createdAt))) : '—'),
         el('td', '', p.size.toLocaleString('en-US')),
         el('td', '', formatHours(p.codingH)),
         el('td', '', String(p.commitsAfter)),
@@ -947,6 +967,49 @@ function renderSprint(current) {
   box.append(prs)
   box.append(el('p', 'muted sig-foot', 'Computed from GitHub the way the growth-signals sprint-score skill does (P75 of your PRs, sprint calendar in WIB), for the team\'s tracked repos merging into release/* only, so it can differ from OrgSignals. Hover a metric for what it measures.'))
   return box
+}
+
+/** The columns of "Your PRs opened in …", and what each sorts by (null sorts last). */
+const SPRINT_COLUMNS = /** @type {const} */ ([
+  { key: 'pr', label: 'PR' },
+  { key: 'opened', label: 'Opened' },
+  { key: 'size', label: 'Size' },
+  { key: 'coding', label: 'Coding' },
+  { key: 'after', label: 'After open' },
+  { key: 'review', label: '1st review' },
+  { key: 'comments', label: 'Comments' },
+  { key: 'cycle', label: 'Cycle' },
+])
+
+/** @typedef {import('../lib/sprint.js').SprintCard['prs'][number]} SprintRow */
+/** @type {Record<string, (p: SprintRow, i: number) => number | string | null>} */
+const SPRINT_SORT = {
+  pr: (p) => p.ref.toLowerCase(),
+  // Cards kept before v0.12.1 have no opened time: they were stored newest first.
+  opened: (p, i) => (p.createdAt ? Date.parse(p.createdAt) : -i),
+  size: (p) => p.size,
+  coding: (p) => p.codingH,
+  after: (p) => p.commitsAfter,
+  review: (p) => p.firstResponseH,
+  comments: (p) => p.comments,
+  cycle: (p) => p.cycleH,
+}
+
+/**
+ * @param {SprintRow[]} prs
+ * @param {string} col
+ * @param {'asc' | 'desc'} dir
+ */
+function sortedPRs(prs, col, dir) {
+  const value = SPRINT_SORT[col] ?? SPRINT_SORT.opened
+  return prs
+    .map((p, i) => ({ p, v: value(p, i), i }))
+    .sort((a, b) => {
+      if (a.v === null || b.v === null) return a.v === b.v ? a.i - b.i : a.v === null ? 1 : -1
+      const c = typeof a.v === 'string' ? a.v.localeCompare(String(b.v), undefined, { numeric: true }) : a.v - /** @type {number} */ (b.v)
+      return (dir === 'asc' ? c : -c) || a.i - b.i
+    })
+    .map((x) => x.p)
 }
 
 /**
