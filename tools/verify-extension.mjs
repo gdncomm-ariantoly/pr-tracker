@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from '@playwright/test'
 
+import { sprintAt } from '../lib/sprint.js'
 import { loadFixture } from './fixture.mjs'
 
 const ROOT = path.dirname(fileURLToPath(new URL('.', import.meta.url)))
@@ -120,8 +121,17 @@ async function verify(context, id) {
   /** @type {Record<string, unknown>} */
   let singleOverride = {}
   let singleState = 'OPEN'
+  /** The sprint searches (OrgSignals tab): search string prefix → PRs. Empty until the OrgSignals checks. */
+  /** @type {Record<string, any[]>} */
+  let sprintPRs = {}
   await context.route('https://api.github.com/graphql', async (route) => {
     authHeaders.push(route.request().headers().authorization ?? '')
+    const body = JSON.parse(route.request().postData() ?? '{}')
+    if (String(body.query).includes('query Sprint')) {
+      const q = String(body.variables?.q ?? '')
+      const key = q.includes('created:') ? 'created' : q.includes('merged:') ? 'merged' : q.includes('reviewed-by:') ? 'reviewed' : 'open'
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { viewer: fixture.data.viewer, search: { issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: sprintPRs[key] ?? [] } } }) })
+    }
     if (mode === 'jenkins-hidden') {
       // What a fine-grained token gets: no build data on any PR, plus an error on it.
       const strip = (/** @type {any} */ search) => ({ ...search, nodes: search.nodes.map((/** @type {any} */ n) => ({ ...n, head: { nodes: [{ commit: { statusCheckRollup: null } }] } })) })
@@ -561,6 +571,23 @@ async function verify(context, id) {
   const intoMaster = scored.requested.nodes[0]
   Object.assign(intoMaster, { repository: { nameWithOwner: 'gdncomm/seo-backend' }, baseRefName: 'master', additions: 5, deletions: 1 })
   fixture.data = scored
+  // This sprint: two of my PRs (one merged, one into master: not scored) and one I reviewed.
+  const from = /** @type {import('../lib/sprint.js').SprintWindow} */ (sprintAt(Date.now())).from
+  const t = (/** @type {number} */ f) => new Date(from + f * (Date.now() - from)).toISOString()
+  const me = fixture.data.viewer.login
+  const sprintPR = (/** @type {number} */ n, /** @type {Record<string, unknown>} */ over) => ({
+    number: n, title: `Sprint change ${n}`, url: `https://github.com/gdncomm/seo-backend/pull/${n}`, state: 'OPEN', createdAt: t(0.4), mergedAt: null,
+    additions: 200, deletions: 40, baseRefName: 'release/2026-10-14', repository: { nameWithOwner: 'gdncomm/seo-backend' }, author: { login: me, __typename: 'User' },
+    commits: { nodes: [{ commit: { authoredDate: t(0.3), committedDate: t(0.3) } }] },
+    reviews: { nodes: [{ author: { login: 'ana', __typename: 'User' }, submittedAt: t(0.5), state: 'APPROVED' }] }, reviewThreads: { nodes: [] }, comments: { nodes: [] }, ...over,
+  })
+  const merged = sprintPR(501, { state: 'MERGED', mergedAt: t(0.6) })
+  sprintPRs = {
+    created: [merged, sprintPR(502, {}), sprintPR(503, { baseRefName: 'master' })],
+    merged: [merged],
+    reviewed: [sprintPR(504, { author: { login: 'ana', __typename: 'User' }, reviews: { nodes: [{ author: { login: me, __typename: 'User' }, submittedAt: t(0.7), state: 'APPROVED' }] } })],
+    open: [],
+  }
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
   const sigBtn = page.locator(`article.pr[data-id="${sig.id}"] .sig-open`)
@@ -590,17 +617,37 @@ async function verify(context, id) {
     const cards = [...document.querySelectorAll('details.stale[open] > .pr')]
     return cards.length < 2 || cards[1].getBoundingClientRect().top - cards[0].getBoundingClientRect().bottom >= 6
   }))
+
+  // The OrgSignals tab: the sprint scorecard.
+  const sprintTab = page.locator('#tab-signals')
+  check('an OrgSignals tab, showing the overall score', (await sprintTab.isVisible()) && /^\d+(\.\d)?$/.test((await page.textContent('#n-signals')) ?? ''), (await page.textContent('#n-signals')) ?? '')
+  await sprintTab.click()
+  const sprint = page.locator('#sprint')
+  check('it lists the four categories', (await sprint.locator('.sprint-cat').count()) === 4)
+  check('all 13 scored metrics, plus 3 inside cycle time', (await sprint.locator('.sprint-cat .sig-row').count()) === 13 && (await sprint.locator('.sprint-context .sig-row').count()) === 3)
+  check('only PRs into release/* count', (await sprint.locator('.sprint-prs tr').count()) === 3 && (await sprint.locator('.sprint-prs a', { hasText: '#503' }).count()) === 0)
+  check('PR size is the P75 of my PRs this sprint', ((await sprint.locator('.sig-row[data-metric="pr_size"] .sig-val strong').textContent()) ?? '') === '240 lines' && ((await sprint.locator('.sig-row[data-metric="pr_size"] .chip').textContent()) ?? '') === 'Elite')
+  check('PRs reviewed counts the one I reviewed', ((await sprint.locator('.sig-row[data-metric="prs_reviewed"] .sig-scale').textContent()) ?? '').startsWith('1 counted'))
+  check('the PR filter is hidden on this tab', await page.isHidden('#pending-filter'))
+  await page.setViewportSize({ width: 390, height: 800 })
+  check('the scorecard fits a phone-width window', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), String(await page.evaluate(() => document.documentElement.scrollWidth)))
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.reload()
+  check('the tab survives a reload', (await page.getAttribute('#tab-signals', 'aria-selected')) === 'true' && (await page.locator('#sprint .sprint-cat').count()) === 4)
+  await page.click('#tab-mine')
   await page.click('#toggle-settings')
   check('the switch is on by default', await page.isChecked('#signals'))
   await page.uncheck('#signals')
   await page.click('#settings button[type=submit]')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
   check('switching it off removes the button', (await sigBtn.count()) === 0)
+  check('and the OrgSignals tab', await page.isHidden('#tab-signals'))
   await page.click('#toggle-settings')
   await page.check('#signals')
   await page.click('#settings button[type=submit]')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
   fixture.data = beforeSignals
+  sprintPRs = {}
   await page.click('#refresh')
   await page.waitForFunction(() => document.querySelector('#refresh')?.textContent === 'Refresh')
 

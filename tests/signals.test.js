@@ -44,6 +44,9 @@ describe('OrgSignals scope', () => {
     assert.equal(inScope('gdncomm/Seo-Backend', 'release/2026.10'), true)
     assert.equal(inScope('gdncomm/seo-backend', 'master'), false)
   })
+  it('follows growth-signals 0.6.2: product-feed-center\'s cucumber suite is tracked', () => {
+    assert.equal(inScope('gdncomm/cucumber-product-feed-center', 'release/x'), true)
+  })
   it('never deployment (nonprod / prod) repos, other repos or other branches', () => {
     assert.equal(inScope('gdncomm/seo-backend-deployment-nonprod', 'release/x'), false)
     assert.equal(inScope('gdncomm/seo-backend-deployment-prod', 'release/x'), false)

@@ -4,7 +4,8 @@ import { markRead, normaliseInbox, removeItem, unreadCount } from '../lib/inbox.
 import { applyOverrides, toggleOverride } from '../lib/overrides.js'
 import { judgeOnePR, refresh, refreshOnePR } from '../lib/refresh.js'
 import { shortLogin } from '../lib/notify.js'
-import { readings, TIER_LABEL, worstTier } from '../lib/signals.js'
+import { formatHours, readings, TIER_LABEL, worstTier } from '../lib/signals.js'
+import { CATEGORIES, CONTEXT, formatValue } from '../lib/sprint.js'
 import { JENKINS_HIDDEN } from '../lib/github.js'
 import { resumeCommand } from '../lib/sessions.js'
 import { claudeCode, helperInfo, localSessions, nativeAllowed, secrets, SUMMARY_HELPER } from '../platform.js'
@@ -39,7 +40,7 @@ const DECISION_LABEL = /** @type {Record<string, string>} */ ({
 })
 
 const state = {
-  /** @type {'toReview' | 'mine'} */ tab: 'toReview',
+  /** @type {'toReview' | 'mine' | 'signals'} */ tab: 'toReview',
   onlyPending: false,
   showWatched: true,
   staleOpen: false,
@@ -61,7 +62,7 @@ const jenkinsAllowed = (origin) => chrome.permissions.contains({ origins: [`${or
 
 try {
   const saved = JSON.parse(localStorage.getItem('ui') ?? '{}')
-  if (saved.tab === 'mine' || saved.tab === 'toReview') state.tab = saved.tab
+  if (saved.tab === 'mine' || saved.tab === 'toReview' || saved.tab === 'signals') state.tab = saved.tab
   state.onlyPending = saved.onlyPending === true
   state.showWatched = saved.showWatched !== false
   state.staleOpen = saved.staleOpen === true
@@ -692,6 +693,13 @@ function paint() {
     btn.setAttribute('aria-selected', String(state.tab === tab))
     $(`n-${tab}`).textContent = String(snap?.[tab].filter(shown).length ?? 0)
   }
+  const signalsTab = $('tab-signals')
+  signalsTab.hidden = !state.showSignals
+  if (state.tab === 'signals' && !state.showSignals) state.tab = 'mine'
+  signalsTab.setAttribute('aria-selected', String(state.tab === 'signals'))
+  const overall = snap?.sprint?.card
+  $('n-signals').textContent = overall ? String(overall.overall) : ''
+  $('pending-filter').hidden = state.tab === 'signals'
   input('only-pending').checked = state.onlyPending
   // Watched-repo PRs (nobody asked me) can be hidden; only offered when there are some.
   const watchedCount = snap?.toReview.filter((p) => p.watched).length ?? 0
@@ -723,6 +731,11 @@ function paint() {
   if (!snap) {
     empty.hidden = false
     empty.textContent = 'No data yet. Add a token in Settings, then Refresh.'
+    return
+  }
+  if (state.tab === 'signals') {
+    empty.hidden = true
+    list.append(renderSprint(snap.sprint))
     return
   }
   const prs = /** @type {ReviewPR[]} */ (snap[state.tab]).filter(shown).filter((p) => !state.onlyPending || p.counts.pending > 0)
@@ -766,6 +779,126 @@ function paint() {
     more.textContent = 'Showing the 30 most recently updated — there are more on GitHub.'
     list.append(more)
   }
+}
+
+/** @param {string} tag @param {string} [className] @param {string} [text] */
+function el(tag, className = '', text = '') {
+  const e = document.createElement(tag)
+  if (className) e.className = className
+  if (text) e.textContent = text
+  return e
+}
+
+/** @param {import('../lib/signals.js').Tier} tier */
+const tierChip = (tier) => el('span', `chip ${TIER_CLASS[tier]}`, TIER_LABEL[tier])
+
+/** WIB calendar date → "19 Oct". @param {string} date */
+const shortDate = (date) => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+
+/**
+ * The OrgSignals tab: this sprint's scorecard, computed at refresh.
+ * @param {import('../lib/sprint.js').SprintCard | undefined} sc
+ */
+function renderSprint(sc) {
+  const box = el('section', 'sprint')
+  box.id = 'sprint'
+  if (!sc) {
+    box.append(el('p', 'muted empty', 'No sprint scorecard yet. Refresh to compute it (the sprint calendar must cover today).'))
+    return box
+  }
+  const s = sc.sprint
+  const head = el('div', 'sprint-head')
+  const title = el('div', 'sprint-title')
+  title.append(el('h2', '', `${s.name} ${s.year}`), el('span', 'muted', `${shortDate(s.start)} – ${shortDate(s.end)} · ${s.current ? `day ${s.day} of ${s.days}` : 'finished'}`))
+  const updated = el('span', 'muted sprint-updated')
+  stamp(updated, sc.computedAt, 'computed ')
+  title.append(updated)
+  head.append(title)
+  if (sc.card) {
+    const score = el('div', 'sprint-overall')
+    score.dataset.tier = sc.card.overallTier
+    score.append(el('strong', '', String(sc.card.overall)), el('span', 'muted', '/ 100'), tierChip(sc.card.overallTier))
+    score.title = 'Overall: the plain mean of the four category scores (OrgSignals\' own weights aren\'t published, so its overall can differ).'
+    head.append(score)
+  }
+  box.append(head)
+  if (s.between) box.append(el('p', 'banner info', `${s.between.name} (${shortDate(s.between.start)} – ${shortDate(s.between.end)}): showing the last sprint.`))
+  if (sc.error) box.append(el('p', 'banner warning', `Couldn't update the scorecard on the last refresh (${sc.error}); this is the previous one.`))
+  if (!sc.card) {
+    box.append(el('p', 'muted empty', `Nothing scored yet in ${s.name}: no PRs opened, merged or reviewed in the team's repos into release/*.`))
+    return box
+  }
+  if (s.current) box.append(el('p', 'muted sprint-note', `Mid-sprint: per-week metrics divide by ${s.weeks} week${s.weeks === 1 ? '' : 's'} so far, and P75s move as more PRs land.`))
+
+  const grid = el('div', 'sprint-cats')
+  for (const cat of CATEGORIES) {
+    const c = sc.card.categories.find((x) => x.key === cat.key)
+    if (!c) continue
+    const block = el('section', 'sprint-cat')
+    block.dataset.category = c.key
+    const h = el('h3', '')
+    h.append(el('span', '', c.label), el('span', 'sprint-pts', `${c.score} / 100`), tierChip(c.tier))
+    block.append(h, metricList(cat.metrics, sc.card.metrics))
+    grid.append(block)
+  }
+  box.append(grid)
+
+  const context = el('details', 'sprint-context')
+  context.append(el('summary', '', 'Inside cycle time (not scored)'), metricList(CONTEXT, sc.card.metrics))
+  box.append(context)
+
+  const prs = el('section', 'sprint-prs')
+  prs.append(el('h3', '', `Your PRs opened in ${s.name} (${sc.prs.length}) · ${sc.reviewedCount} reviewed for others`))
+  if (sc.prs.length) {
+    const table = el('table', '')
+    const thead = el('tr', '')
+    for (const t of ['PR', 'Size', 'Coding', 'After open', '1st review', 'Comments', 'Cycle']) thead.append(el('th', '', t))
+    table.append(thead)
+    for (const p of sc.prs) {
+      const row = el('tr', '')
+      const cell = el('td', 'sprint-pr')
+      const a = /** @type {HTMLAnchorElement} */ (el('a', '', p.ref.replace(/^gdncomm\//, '')))
+      a.href = p.url
+      a.target = '_blank'
+      a.rel = 'noopener'
+      cell.append(a, el('span', 'muted', ` ${p.title}`))
+      row.append(
+        cell,
+        el('td', '', p.size.toLocaleString('en-US')),
+        el('td', '', formatHours(p.codingH)),
+        el('td', '', String(p.commitsAfter)),
+        el('td', '', p.firstResponseH === null ? '—' : formatHours(Math.max(0.01, p.firstResponseH))),
+        el('td', '', String(p.comments)),
+        el('td', '', p.cycleH === null ? 'open' : formatHours(Math.max(0.01, p.cycleH))),
+      )
+      table.append(row)
+    }
+    const wrap = el('div', 'sprint-table')
+    wrap.append(table)
+    prs.append(wrap)
+  }
+  box.append(prs)
+  box.append(el('p', 'muted sig-foot', 'Computed from GitHub the way the growth-signals sprint-score skill does (P75 of your PRs, sprint calendar in WIB), for the team\'s tracked repos merging into release/* only, so it can differ from OrgSignals. Hover a metric for what it measures.'))
+  return box
+}
+
+/** @param {string[]} keys @param {Record<string, import('../lib/sprint.js').ScoredMetric>} metrics */
+function metricList(keys, metrics) {
+  const ul = el('ul', 'sig-list')
+  for (const key of keys) {
+    const m = metrics[key]
+    if (!m) continue
+    const li = el('li', 'sig-row')
+    li.dataset.metric = key
+    li.title = `${m.label}: ${m.means}.`
+    const val = el('span', 'sig-val')
+    val.append(el('strong', '', formatValue(m)), tierChip(m.tier))
+    if (m.max) val.append(el('span', 'note', `${m.points}/${m.max} pts`))
+    const detail = [`${m.samples} ${m.unit === '/wk' || key === 'coding_days' ? 'counted' : `sample${m.samples === 1 ? '' : 's'}`}`, m.next].filter(Boolean).join(' · ')
+    li.append(el('span', 'sig-name', m.label), val, el('span', 'sig-means', m.means), el('span', 'sig-scale', detail))
+    ul.append(li)
+  }
+  return ul
 }
 
 /** @param {string | null | undefined} message */
@@ -1081,7 +1214,7 @@ $('jenkins-token-clear').addEventListener('click', async () => {
 
 for (const btn of document.querySelectorAll('[data-tab]')) {
   btn.addEventListener('click', () => {
-    state.tab = /** @type {'toReview' | 'mine'} */ (/** @type {HTMLElement} */ (btn).dataset.tab)
+    state.tab = /** @type {'toReview' | 'mine' | 'signals'} */ (/** @type {HTMLElement} */ (btn).dataset.tab)
     remember()
     paint()
   })

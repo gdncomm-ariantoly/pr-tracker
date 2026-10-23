@@ -71,6 +71,10 @@ Only the CI Jenkins (`jenkins-build-ci-2`) reports PR builds to GitHub. Deployme
 
 ### OrgSignals metrics
 
+**Sprint tab.** The **OrgSignals** tab (its count shows your overall score) is your scorecard for the current sprint, from the sprint calendar in WIB (in a gap or hack week, the sprint before it): all 13 scored metrics in their four categories — Speed, Quality, Throughput, Collaboration — each with its value, tier, points and what it takes to reach the next tier, plus the three parts of cycle time (pick-up, review, merge; not scored) and a table of your PRs opened this sprint. It is computed at every refresh exactly like the growth-signals *sprint-score* skill (0.6.2): P75 across your PRs, per-week metrics divided by the weeks so far, category scores out of 100, overall as their plain mean (OrgSignals' own weights aren't published). Same scope as the per-PR button: tracked repos into `release/*` only. When a refresh can't reach the sprint searches, the last scorecard stays with a note.
+
+**Per PR.**
+
 Every PR that OrgSignals (Signals AI) scores gets an **OrgSignals** button next to its comment count, coloured by the PR's weakest tier — green Elite, blue High, yellow Medium, red Needs focus, gray No activity; hovering it names the metrics that need focus. Clicking it opens a pop-up with one row per metric: this PR's value, its tier and the tier scale. Esc, × or a click outside closes it; values that depend on the time (no review yet, cycle time) keep counting while it's open.
 
 | Row value | Metric | Elite |
@@ -83,7 +87,7 @@ Every PR that OrgSignals (Signals AI) scores gets an **OrgSignals** button next 
 | 23h *so far* | Cycle time if merged now: first commit → now | ≤ 27 h |
 | No review | Nobody else has reviewed it yet; merged like this it counts against *Unreviewed PRs merged* | — |
 
-**Which PRs.** Only those OrgSignals scores: the team's tracked repos (56, from the OrgSignals team settings) merging into a `release/*` branch — PRs into `master` or any other branch don't count. Deployment repos — `prod-…`, `nonprod-…` (Rundeck, infra, deploy) and `*-deployment-*` — never get the button, nor do other squads' repos or PRs into other branches. The rules are computed from GitHub the way the growth-signals *sprint-score* skill does it (bots, Jenkins and deleted accounts never count as reviewers; the page's own *Extra bot logins* don't apply), so they can differ slightly from OrgSignals' own numbers. OrgSignals scores a sprint by the P75 of these per-PR values, so a red button on one PR is a hint, not your score. The repo list and tier bounds are copied into `lib/signals.js`; update them when the lead changes the team settings. Switch off in Settings → *Show OrgSignals metrics on each PR*.
+**Which PRs.** Only those OrgSignals scores: the team's tracked repos (57, from the OrgSignals team settings as of growth-signals 0.6.2) merging into a `release/*` branch — PRs into `master` or any other branch don't count. Deployment repos — `prod-…`, `nonprod-…` (Rundeck, infra, deploy) and `*-deployment-*` — never get the button, nor do other squads' repos or PRs into other branches. The rules are computed from GitHub the way the growth-signals *sprint-score* skill does it (bots, Jenkins and deleted accounts never count as reviewers; the page's own *Extra bot logins* don't apply), so they can differ slightly from OrgSignals' own numbers. OrgSignals scores a sprint by the P75 of these per-PR values, so a red button on one PR is a hint, not your score. The repo list and tier bounds are copied into `lib/signals.js`; update them when the lead changes the team settings. Switch off in Settings → *Show OrgSignals metrics (sprint tab and each PR)*.
 
 ### Layout
 

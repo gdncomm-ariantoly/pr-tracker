@@ -100,8 +100,8 @@
       </div>
       <label class="check">
         <input type="checkbox" id="signals" />
-        Show OrgSignals metrics on each PR
-        <small class="muted">An <em>OrgSignals</em> button on the PR, coloured by its weakest tier, opens PR size, coding time, commits after the PR was raised, time to first comment, comment count and cycle time so far, each with its OrgSignals tier (Elite, High, Medium, Needs focus). Only on PRs OrgSignals scores: the team's tracked repos, merging into a <code>release/*</code> branch — not <code>master</code>, and never deployment (nonprod / prod) repos. Computed from GitHub like the growth-signals <em>sprint-score</em> skill, so it can differ slightly from OrgSignals.</small>
+        Show OrgSignals metrics (sprint tab and each PR)
+        <small class="muted">An <em>OrgSignals</em> tab with your sprint scorecard (all 13 metrics, the four categories and an overall score, as the growth-signals <em>sprint-score</em> skill computes them), and an <em>OrgSignals</em> button on the PR, coloured by its weakest tier, opens PR size, coding time, commits after the PR was raised, time to first comment, comment count and cycle time so far, each with its OrgSignals tier (Elite, High, Medium, Needs focus). Only on PRs OrgSignals scores: the team's tracked repos, merging into a <code>release/*</code> branch — not <code>master</code>, and never deployment (nonprod / prod) repos. Computed from GitHub like the growth-signals <em>sprint-score</em> skill, so it can differ slightly from OrgSignals.</small>
       </label>
       <label class="check">
         <input type="checkbox" id="notify" />
@@ -134,9 +134,10 @@
     <nav class="tabs" role="tablist">
       <button type="button" role="tab" id="tab-toReview" data-tab="toReview" aria-selected="true">To review <span class="n" id="n-toReview">0</span></button>
       <button type="button" role="tab" id="tab-mine" data-tab="mine" aria-selected="false">My PRs <span class="n" id="n-mine">0</span></button>
+      <button type="button" role="tab" id="tab-signals" data-tab="signals" aria-selected="false" hidden>OrgSignals <span class="n" id="n-signals"></span></button>
       <span class="spacer"></span>
       <label class="filter" id="watched-filter" hidden><input type="checkbox" id="show-watched" /> Watched repos <span class="n" id="n-watched">0</span></label>
-      <label class="filter"><input type="checkbox" id="only-pending" /> Only PRs with unfixed comments</label>
+      <label class="filter" id="pending-filter"><input type="checkbox" id="only-pending" /> Only PRs with unfixed comments</label>
     </nav>
 
     <main id="list" aria-live="polite"></main>

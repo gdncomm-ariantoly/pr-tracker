@@ -26,9 +26,10 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `lib/inbox.js` | Updates panel history (last 100) |
 | `lib/overrides.js` | User's "No action needed" marks layered over analysis |
 | `lib/signals.js` | OrgSignals per-PR metrics: scope (team repos, base `release/*` only, never `prod-`/`nonprod-` deployment repos), tiers and bot rule copied from growth-signals `sprint-score` `scoring.json` |
+| `lib/sprint.js` | OrgSignals sprint scorecard (the OrgSignals tab): sprint calendar (WIB), 13 scored + 3 context metrics, tiers, points, categories and overall, ported from growth-signals `sprint-score` (`metrics.py`, `scoring.py`, `sprint_calendar.py`; rules/calendar 0.6.2); same scope as `signals.js`. Stored as `snapshot.sprint` at each full refresh (4 paged searches, `fetchSprint` in `github.js`); a failure keeps the last card with `error` |
 | `lib/sessions.js` | PR ↔ Claude Code session links (comment marker + helper scan) |
 | `lib/store.js` | Settings, snapshot, caches in `chrome.storage.local` (storage area is an argument for tests) |
-| `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings (`#settings-dialog`, with its own error line `#settings-error` since the page banner sits behind it) and OrgSignals (`#signals-dialog`, opened from a card's `.sig-open` button) are modal `<dialog>`s sharing the `.modal` styles |
+| `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings (`#settings-dialog`, with its own error line `#settings-error` since the page banner sits behind it) and OrgSignals (`#signals-dialog`, opened from a card's `.sig-open` button) are modal `<dialog>`s sharing the `.modal` styles; tabs To review / My PRs / OrgSignals (`#tab-signals`, hidden when Settings → OrgSignals is off) |
 | `pages/markdown.js` | Renders GitHub `bodyHTML` through an allowlist, parsed inert; never trust remote HTML |
 | `native/` | Local native-messaging helper: `host.mjs` (sessions scan; runs `claude -p` with no tools, only after `claude auth status` shows a Team/Enterprise plan or Bedrock/Vertex; Keychain `secret-get/set/delete` via `/usr/bin/security`), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` (writes the gitignored `host-run.sh` launcher and the Chrome host manifest) |
 | `tests/` | `node --test` unit tests, `tests/fixtures/` sample GraphQL data |
