@@ -690,7 +690,17 @@ function refreshButton(pr) {
 /** Hidden by the Watched repos filter? */
 const shown = (/** @type {ReviewPR} */ pr) => state.showWatched || !pr.watched
 
+/**
+ * Redraw the page. The list is rebuilt from scratch, which would leave the
+ * page momentarily short and snap it to the top: keep where the reader was.
+ */
 function paint() {
+  const y = window.scrollY
+  paintList()
+  if (window.scrollY !== y) window.scrollTo({ top: y, behavior: 'instant' })
+}
+
+function paintList() {
   const snap = state.snapshot && applyOverrides(state.snapshot, state.overrides)
   state.jenkinsHidden = !!snap?.warnings?.some((w) => w.startsWith(JENKINS_HIDDEN))
   const list = $('list')
@@ -921,45 +931,7 @@ function renderSprint(current) {
   prs.append(el('h3', '', `Your PRs opened in ${isYear ? s.year : s.name} (${sc.prs.length}) · ${sc.reviewedCount} reviewed for others`))
   if (sc.prs.length) {
     const table = el('table', '')
-    const thead = el('tr', '')
-    const { col, dir } = SPRINT_COLUMNS.some((c) => c.key === state.sprintSort.col) ? state.sprintSort : { col: 'opened', dir: /** @type {'desc'} */ ('desc') }
-    for (const c of SPRINT_COLUMNS) {
-      const th = el('th', '')
-      th.setAttribute('aria-sort', c.key === col ? (dir === 'asc' ? 'ascending' : 'descending') : 'none')
-      const btn = /** @type {HTMLButtonElement} */ (el('button', 'sort', c.label))
-      btn.type = 'button'
-      btn.dataset.sort = c.key
-      btn.title = `Sort by ${c.label.toLowerCase()}`
-      btn.addEventListener('click', () => {
-        // Numbers start largest first (the PRs to look at); the PR name A → Z.
-        state.sprintSort = { col: c.key, dir: c.key === col ? (dir === 'asc' ? 'desc' : 'asc') : c.key === 'pr' ? 'asc' : 'desc' }
-        remember()
-        paint()
-      })
-      th.append(btn)
-      thead.append(th)
-    }
-    table.append(thead)
-    for (const p of sortedPRs(sc.prs, col, dir)) {
-      const row = el('tr', '')
-      const cell = el('td', 'sprint-pr')
-      const a = /** @type {HTMLAnchorElement} */ (el('a', '', p.ref.replace(/^gdncomm\//, '')))
-      a.href = p.url
-      a.target = '_blank'
-      a.rel = 'noopener'
-      cell.append(a, el('span', 'muted', ` ${p.title}`))
-      row.append(
-        cell,
-        el('td', '', p.createdAt ? shortDate(wibDate(Date.parse(p.createdAt))) : '—'),
-        el('td', '', p.size.toLocaleString('en-US')),
-        el('td', '', formatHours(p.codingH)),
-        el('td', '', String(p.commitsAfter)),
-        el('td', '', p.firstResponseH === null ? '—' : formatHours(Math.max(0.01, p.firstResponseH))),
-        el('td', '', String(p.comments)),
-        el('td', '', p.cycleH === null ? 'open' : formatHours(Math.max(0.01, p.cycleH))),
-      )
-      table.append(row)
-    }
+    fillPRTable(table, sc.prs)
     const wrap = el('div', 'sprint-table')
     wrap.append(table)
     prs.append(wrap)
@@ -967,6 +939,57 @@ function renderSprint(current) {
   box.append(prs)
   box.append(el('p', 'muted sig-foot', 'Computed from GitHub the way the growth-signals sprint-score skill does (P75 of your PRs, sprint calendar in WIB), for the team\'s tracked repos merging into release/* only, so it can differ from OrgSignals. Hover a metric for what it measures.'))
   return box
+}
+
+/**
+ * The rows of "Your PRs opened in …", in the chosen order. A header click
+ * sorts this table alone, so nothing else on the page moves.
+ *
+ * @param {HTMLElement} table
+ * @param {SprintRow[]} prs
+ */
+function fillPRTable(table, prs) {
+  const thead = el('tr', '')
+  const { col, dir } = SPRINT_COLUMNS.some((c) => c.key === state.sprintSort.col) ? state.sprintSort : { col: 'opened', dir: /** @type {'desc'} */ ('desc') }
+  for (const c of SPRINT_COLUMNS) {
+    const th = el('th', '')
+    th.setAttribute('aria-sort', c.key === col ? (dir === 'asc' ? 'ascending' : 'descending') : 'none')
+    const btn = /** @type {HTMLButtonElement} */ (el('button', 'sort', c.label))
+    btn.type = 'button'
+    btn.dataset.sort = c.key
+    btn.title = `Sort by ${c.label.toLowerCase()}`
+    btn.addEventListener('click', () => {
+      // Numbers start largest first (the PRs to look at); the PR name A → Z.
+      state.sprintSort = { col: c.key, dir: c.key === col ? (dir === 'asc' ? 'desc' : 'asc') : c.key === 'pr' ? 'asc' : 'desc' }
+      remember()
+      fillPRTable(table, prs)
+      const again = /** @type {HTMLElement | null} */ (table.querySelector(`button[data-sort="${c.key}"]`))
+      again?.focus({ preventScroll: true })
+    })
+    th.append(btn)
+    thead.append(th)
+  }
+  const rows = sortedPRs(prs, col, dir).map((p) => {
+    const row = el('tr', '')
+    const cell = el('td', 'sprint-pr')
+    const a = /** @type {HTMLAnchorElement} */ (el('a', '', p.ref.replace(/^gdncomm\//, '')))
+    a.href = p.url
+    a.target = '_blank'
+    a.rel = 'noopener'
+    cell.append(a, el('span', 'muted', ` ${p.title}`))
+    row.append(
+      cell,
+      el('td', '', p.createdAt ? shortDate(wibDate(Date.parse(p.createdAt))) : '—'),
+      el('td', '', p.size.toLocaleString('en-US')),
+      el('td', '', formatHours(p.codingH)),
+      el('td', '', String(p.commitsAfter)),
+      el('td', '', p.firstResponseH === null ? '—' : formatHours(Math.max(0.01, p.firstResponseH))),
+      el('td', '', String(p.comments)),
+      el('td', '', p.cycleH === null ? 'open' : formatHours(Math.max(0.01, p.cycleH))),
+    )
+    return row
+  })
+  table.replaceChildren(thead, ...rows)
 }
 
 /** The columns of "Your PRs opened in …", and what each sorts by (null sorts last). */

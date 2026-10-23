@@ -657,7 +657,10 @@ async function verify(context, id) {
   check('the whole year is a choice too', ((await page.textContent('#sprint h2')) ?? '') === `Whole ${thisSprint.year}` && (await sprint.locator('.sprint-cat').count()) === 4 && (await sprint.locator('.sprint-prs tr').count()) === (earlier ? 4 : 3))
   if (earlier) {
     const firstPR = async () => ((await sprint.locator('.sprint-prs tr:nth-child(2) a').textContent()) ?? '')
+    await sprint.locator('.sprint-prs').scrollIntoViewIfNeeded()
+    const scrolled = await page.evaluate(() => window.scrollY)
     await sprint.locator('.sprint-prs th button[data-sort="size"]').click()
+    check('sorting keeps the page where it was', scrolled > 0 && (await page.evaluate(() => window.scrollY)) === scrolled, `${scrolled} → ${await page.evaluate(() => window.scrollY)}`)
     const desc = (await firstPR()).endsWith('#501') || (await firstPR()).endsWith('#502')
     const descMark = await sprint.locator('.sprint-prs th:has(button[data-sort="size"])').getAttribute('aria-sort')
     await sprint.locator('.sprint-prs th button[data-sort="size"]').click()
