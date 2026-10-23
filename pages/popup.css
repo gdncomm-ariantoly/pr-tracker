@@ -1,8 +1,18 @@
 * { box-sizing: border-box; }
+/* Chrome sizes a pop-up to its document: a fixed size keeps it still when the
+   tab or the list changes; only the list scrolls. */
+html {
+  width: 400px;
+  height: 540px;
+  background: var(--bg);
+}
 body {
   margin: 0;
-  width: 400px;
-  max-height: 580px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
   color: var(--fg);
   font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -18,19 +28,24 @@ button {
 button:disabled { opacity: .6; cursor: default; }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
 
-.head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--card); border-bottom: 1px solid var(--line); }
-.head #fetched { font-size: 12px; white-space: nowrap; }
+.head { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--card); border-bottom: 1px solid var(--line); }
+.head img { flex: none; }
+.head strong { white-space: nowrap; }
+.head #fetched { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; white-space: nowrap; }
+.head button { flex: none; }
 
-.banner { margin: 8px 12px 0; padding: 6px 10px; border-radius: 6px; font-size: 12px; }
+.banner { flex: none; margin: 10px 12px 0; padding: 6px 10px; border-radius: 6px; font-size: 12px; }
 .banner.error { background: var(--bad-bg); color: var(--bad-fg); }
 
-.tabs { display: flex; gap: 6px; padding: 10px 12px 6px; }
+.tabs { flex: none; display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .tabs [role=tab] { border-radius: 999px; padding: 2px 12px; }
 .tabs [role=tab][aria-selected=true] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .tabs .n { font-size: 11px; opacity: .8; margin-left: 3px; }
 
-.list { list-style: none; margin: 0; padding: 0 12px 6px; display: grid; gap: 6px; }
-.row { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; color: var(--fg); min-width: 0; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 10px 12px 12px; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.list li { min-width: 0; }
+.row { display: block; overflow: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; color: var(--fg); min-width: 0; }
 .row:hover { text-decoration: none; border-color: var(--link); }
 .row .t { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .m { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 3px; font-size: 11.5px; color: var(--muted); }
@@ -43,5 +58,6 @@ button.primary { background: var(--accent); color: var(--accent-fg); border-colo
 .c-warn { background: var(--warn-bg); color: var(--warn-fg); }
 .chip.build::before { content: "●"; margin-right: 3px; font-size: 8px; vertical-align: 1px; }
 
-.empty, .more { margin: 6px 12px 12px; font-size: 12px; }
+.empty, .more { margin: 10px 0 0; font-size: 12px; }
+.list:empty + .empty { margin-top: 0; }
 .more a { cursor: pointer; }

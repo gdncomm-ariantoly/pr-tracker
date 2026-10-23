@@ -23,9 +23,11 @@
       <button type="button" role="tab" id="tab-mine" data-tab="mine" aria-selected="false">My PRs <span class="n" id="n-mine">0</span></button>
     </nav>
 
-    <ul class="list" id="list" aria-live="polite"></ul>
-    <p class="muted empty" id="empty" hidden></p>
-    <p class="muted more" id="more" hidden></p>
+    <main class="scroll">
+      <ul class="list" id="list" aria-live="polite"></ul>
+      <p class="muted empty" id="empty" hidden></p>
+      <p class="muted more" id="more" hidden></p>
+    </main>
 
     <script type="module" src="popup.js"></script>
   </body>

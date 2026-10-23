@@ -420,6 +420,35 @@ async function verify(context, id) {
   check('"Open full page" brings up the dashboard tab already open, and closes the pop-up', wasClosed && tabsAfter === tabsBefore && tabsBefore === 1, JSON.stringify({ wasClosed, tabsBefore, tabsAfter }))
   check('the pop-up has no console errors', popupErrors.length === 0, popupErrors[0])
 
+  // The real toolbar pop-up (not a tab): Chrome sizes it to the document, so it must keep one size.
+  await worker0.evaluate(async () => {
+    const { snapshot } = /** @type {any} */ (await chrome.storage.local.get('snapshot'))
+    snapshot.toReview[0] = { ...snapshot.toReview[0], title: 'A very long pull request title that goes on and on well past the width of the pop-up window '.repeat(3) }
+    await chrome.storage.local.set({ snapshot })
+  })
+  await page.bringToFront()
+  // Headless Chromium can't open it; --headed can. The page reaches the open pop-up's window.
+  const sizes = await page.evaluate(async () => {
+    if ((await chrome.action.openPopup().then(() => 'ok', () => 'no')) !== 'ok') return null
+    for (let i = 0; i < 50 && !chrome.extension.getViews({ type: 'popup' })[0]?.document.querySelector('#list .row'); i++) await new Promise((r) => setTimeout(r, 100))
+    const w = chrome.extension.getViews({ type: 'popup' })[0]
+    if (!w) return null
+    const size = () => `${w.innerWidth}x${w.innerHeight} scroll ${w.document.documentElement.scrollWidth}x${w.document.documentElement.scrollHeight}`
+    const tab = (/** @type {string} */ name) => /** @type {HTMLElement} */ (w.document.querySelector(`#tab-${name}`)).click()
+    tab('toReview')
+    await new Promise((r) => setTimeout(r, 300))
+    const a = size()
+    tab('mine')
+    await new Promise((r) => setTimeout(r, 300))
+    const b = size()
+    w.close()
+    return [a, b]
+  })
+  // Width 400 and nothing wider; Chrome may cap the height to the screen, so only sameness is checked there.
+  const flat = (/** @type {string} */ v) => { const [w, , sw] = v.split(/x| scroll |x/).map(Number); return { w, sw } }
+  if (sizes) check('the real pop-up keeps one size across tabs, long titles included', sizes[0] === sizes[1] && flat(sizes[0]).sw <= flat(sizes[0]).w && flat(sizes[0]).w <= 416, sizes.join(' / '))
+  else console.log('  (skipped: headless Chromium does not open the toolbar pop-up; run with --headed)')
+
   // Updates → notifications. Serve a second response with one new human
   // comment on my first PR, and check the worker raised a notification for it.
   const worker = context.serviceWorkers()[0]

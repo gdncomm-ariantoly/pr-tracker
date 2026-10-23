@@ -30,7 +30,7 @@ Whenever a change adds, removes or renames a module, command, setting, permissio
 | `lib/sessions.js` | PR ↔ Claude Code session links (comment marker + helper scan) |
 | `lib/store.js` | Settings, snapshot, caches in `chrome.storage.local` (storage area is an argument for tests) |
 | `pages/app.html`, `app.js`, `app.css` | Dashboard page UI; Settings (`#settings-dialog`, with its own error line `#settings-error` since the page banner sits behind it) and OrgSignals (`#signals-dialog`, opened from a card's `.sig-open` button) are modal `<dialog>`s sharing the `.modal` styles; tabs To review / My PRs / OrgSignals (`#tab-signals`, hidden when Settings → OrgSignals is off) |
-| `pages/popup.html`, `popup.js`, `popup.css` | Toolbar pop-up (`action.default_popup`): compact To review / My PRs from the stored snapshot, rows link to GitHub, ↻ and Open full page go through the worker; no token yet: opens the full page |
+| `pages/popup.html`, `popup.js`, `popup.css` | Toolbar pop-up (`action.default_popup`; fixed 400×540 document, since Chrome sizes a pop-up to its content, and only the list scrolls): compact To review / My PRs from the stored snapshot, rows link to GitHub, ↻ and Open full page go through the worker; no token yet: opens the full page |
 | `pages/tokens.css` | Colour tokens (light/dark) shared by `app.css` and `popup.css` |
 | `pages/markdown.js` | Renders GitHub `bodyHTML` through an allowlist, parsed inert; never trust remote HTML |
 | `native/` | Local native-messaging helper: `host.mjs` (sessions scan; runs `claude -p` with no tools, only after `claude auth status` shows a Team/Enterprise plan or Bedrock/Vertex; Keychain `secret-get/set/delete` via `/usr/bin/security`), `scan.mjs`, `claude-code-hook.mjs`, `install.sh` (writes the gitignored `host-run.sh` launcher and the Chrome host manifest) |
@@ -56,6 +56,8 @@ node tools/verify-sessions.mjs  # native helper end to end: sessions + Summarize
 ```
 
 Run `npm test` and `npm run typecheck` on every change; run `npm run verify` (and the relevant `verify-*.mjs`) for anything touching the manifest, worker, page or helper. Unit tests cannot catch a manifest that does not parse, a worker that fails to register, or CSS defeating `element.hidden`.
+
+The real toolbar pop-up (not the page opened as a tab) is only measured when Chromium opens it, reliably with `node tools/verify-extension.mjs --headed`; headless may skip that check.
 
 Real-data check: `gh api graphql --input <(node tools/print-query.mjs) > /tmp/dashboard.json && FIXTURE=/tmp/dashboard.json npm run verify`.
 
